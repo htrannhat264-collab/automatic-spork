@@ -1,6 +1,6 @@
 const express = require('express');
 const axios = require('axios');
-const AdvancedBaccaratPredictor = require('./advancedBaccaratPredictor');
+const AdvancedBaccaratPredictor = require('./AdvancedBaccaratPredictor');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
