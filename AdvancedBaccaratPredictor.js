@@ -12,81 +12,54 @@ class AdvancedBaccaratPredictor {
         this.winRateHistory = [];
         this.accuracyHistory = [];
         
-        // ===== CẤU HÌNH =====
         this.config = {
             recentWindow: 25,
             patternWindow: 20,
             minDataPoints: 5,
             confidenceThreshold: 0.3,
-            learningRate: 0.01,
-            maxStreakWeight: 1.5,
-            zigzagWeight: 1.3,
-            markovWeight: 1.4,
-            neuralWeight: 1.2,
-            correlationWeight: 1.1
+            learningRate: 0.01
         };
         
-        // ===== TRỌNG SỐ ĐỘNG (30+ phương pháp) =====
+        // 30+ phương pháp với trọng số
         this.weights = {
-            // Nhóm thống kê cơ bản
             frequency: 0.06,
             frequency_weighted: 0.05,
             recent: 0.06,
             recent_weighted: 0.05,
-            
-            // Nhóm pattern
             streak: 0.05,
             zigzag: 0.04,
             repeat: 0.04,
             pattern_2_2: 0.03,
             pattern_3_3: 0.03,
             pattern_4_4: 0.02,
-            pattern_1_2_3: 0.02,
-            pattern_2_1_2: 0.02,
-            
-            // Nhóm Markov
+            pattern_123: 0.02,
+            pattern_212: 0.02,
             markov1: 0.05,
             markov2: 0.04,
             markov3: 0.03,
             markov_adaptive: 0.03,
-            
-            // Nhóm xác suất
             bayesian: 0.04,
             bayesian_adaptive: 0.03,
             posterior: 0.03,
-            
-            // Nhóm AI
             neural: 0.04,
-            neural_deep: 0.03,
-            neural_lstm: 0.02,
-            
-            // Nhóm phân tích chuỗi
+            deep_neural: 0.03,
+            lstm: 0.02,
             gap: 0.03,
             correlation: 0.03,
             autocorrelation: 0.02,
             cross_correlation: 0.02,
-            
-            // Nhóm entropy
             entropy: 0.02,
-            entropy_adaptive: 0.02,
+            adaptive_entropy: 0.02,
             information_gain: 0.02,
-            
-            // Nhóm động lượng
             momentum: 0.02,
-            momentum_adaptive: 0.02,
+            adaptive_momentum: 0.02,
             acceleration: 0.02,
-            
-            // Nhóm hồi quy
             regression: 0.02,
-            regression_adaptive: 0.02,
-            polynomial_regression: 0.01,
-            
-            // Nhóm phân cụm
+            adaptive_regression: 0.02,
+            polynomial: 0.01,
             cluster: 0.02,
             hierarchical: 0.01,
             density: 0.01,
-            
-            // Nhóm khác
             pair: 0.02,
             triple: 0.02,
             distribution: 0.02,
@@ -94,12 +67,12 @@ class AdvancedBaccaratPredictor {
             harmonic: 0.01,
             fibonacci: 0.01,
             resistance: 0.01,
-            support: 0.01,
+            support_resistance: 0.01,
             pivot: 0.01,
             trendline: 0.01
         };
         
-        // ===== MA TRẬN MARKOV =====
+        // Markov
         this.markov1 = {
             'B': { 'B': 0, 'P': 0, 'T': 0 },
             'P': { 'B': 0, 'P': 0, 'T': 0 },
@@ -108,7 +81,7 @@ class AdvancedBaccaratPredictor {
         this.markov2 = {};
         this.markov3 = {};
         
-        // ===== THAM SỐ BAYES =====
+        // Bayesian
         this.prior = { 'B': 0.45, 'P': 0.45, 'T': 0.10 };
         this.prior_adaptive = { 'B': 0.45, 'P': 0.45, 'T': 0.10 };
         this.likelihood = {
@@ -116,14 +89,9 @@ class AdvancedBaccaratPredictor {
             'P': { 'B': 0.3, 'P': 0.4, 'T': 0.3 },
             'T': { 'B': 0.2, 'P': 0.2, 'T': 0.6 }
         };
-        this.posterior_history = [];
         
-        // ===== NEURAL NETWORK =====
+        // Neural Network
         this.neural = {
-            input: { 'B': 0, 'P': 0, 'T': 0 },
-            hidden1: { 'B': 0, 'P': 0, 'T': 0 },
-            hidden2: { 'B': 0, 'P': 0, 'T': 0 },
-            output: { 'B': 0, 'P': 0, 'T': 0 },
             weights1: {
                 'B': { 'B': 0.35, 'P': 0.25, 'T': 0.15 },
                 'P': { 'B': 0.25, 'P': 0.35, 'T': 0.15 },
@@ -138,7 +106,7 @@ class AdvancedBaccaratPredictor {
             bias2: { 'B': 0.1, 'P': 0.1, 'T': 0.1 }
         };
         
-        // ===== THỐNG KÊ =====
+        // Stats
         this.stats = {
             counts: { 'B': 0, 'P': 0, 'T': 0 },
             weighted_counts: { 'B': 0, 'P': 0, 'T': 0 },
@@ -147,56 +115,15 @@ class AdvancedBaccaratPredictor {
             minStreaks: { 'B': Infinity, 'P': Infinity, 'T': Infinity },
             pairs: {},
             triples: {},
-            quadruples: {},
             gaps: { 'B': [], 'P': [], 'T': [] },
-            lastPositions: { 'B': -1, 'P': -1, 'T': -1 },
-            zigzag: [],
-            trend: [],
-            volatility: [],
-            entropy: [],
-            momentum: []
+            lastPositions: { 'B': -1, 'P': -1, 'T': -1 }
         };
         
-        // ===== LỊCH SỬ =====
         this.detailedHistory = [];
         this.predictionResults = [];
-        this.performance = {
-            byMethod: {},
-            bySession: {},
-            overall: { correct: 0, total: 0, accuracy: 0 }
-        };
-        
-        // ===== PHÂN TÍCH KỸ THUẬT =====
-        this.technical = {
-            support: { 'B': [], 'P': [] },
-            resistance: { 'B': [], 'P': [] },
-            pivot: { 'B': 0, 'P': 0 },
-            trendline: { 'B': { slope: 0, intercept: 0 }, 'P': { slope: 0, intercept: 0 } }
-        };
-        
-        // ===== BỘ NHỚ ADAPTIVE =====
-        this.adaptive = {
-            lastAccuracy: 0,
-            weightAdjustment: 0,
-            learningRate: 0.01,
-            momentumBuffer: [],
-            entropyBuffer: [],
-            confidenceBuffer: []
-        };
-        
-        // ===== CÁC BIẾN KHÁC =====
-        this.cycleCount = 0;
-        this.currentTrend = 'neutral';
-        this.trendStrength = 0;
-        this.patternConfidence = 0;
-        this.compositeScore = { 'B': 0, 'P': 0, 'T': 0 };
     }
 
-    // ============================================================
-    // NHÓM 1: PHÂN TÍCH TẦN SUẤT (4 phương pháp)
-    // ============================================================
-
-    // 1.1 Tần suất cơ bản
+    // ===== FREQUENCY ANALYSIS =====
     frequencyAnalysis(history) {
         const total = history.length || 1;
         const counts = { 'B': 0, 'P': 0, 'T': 0 };
@@ -204,100 +131,30 @@ class AdvancedBaccaratPredictor {
             if (counts[char] !== undefined) counts[char]++;
         }
         const pred = this.getMaxKey(counts);
-        const confidence = counts[pred] / total;
         return {
             prediction: pred,
-            confidence: Math.min(confidence, 0.9),
-            counts: counts,
-            percentages: {
-                'B': (counts['B'] / total) * 100,
-                'P': (counts['P'] / total) * 100,
-                'T': (counts['T'] / total) * 100
-            }
+            confidence: Math.min(counts[pred] / total, 0.9),
+            counts: counts
         };
     }
 
-    // 1.2 Tần suất có trọng số
     frequencyWeightedAnalysis(history) {
         const total = history.length || 1;
         const weighted = { 'B': 0, 'P': 0, 'T': 0 };
         for (let i = 0; i < history.length; i++) {
             const char = history[i];
-            const weight = 1 + (i / history.length); // Trọng số tăng dần
+            const weight = 1 + (i / history.length);
             if (weighted[char] !== undefined) weighted[char] += weight;
         }
         const pred = this.getMaxKey(weighted);
-        const maxWeight = weighted[pred];
         const totalWeight = Object.values(weighted).reduce((a, b) => a + b, 0);
-        const confidence = maxWeight / totalWeight;
         return {
             prediction: pred,
-            confidence: Math.min(confidence * 1.2, 0.9),
-            weighted: weighted
+            confidence: Math.min((weighted[pred] / totalWeight) * 1.2, 0.9)
         };
     }
 
-    // 1.3 Tần suất theo cửa sổ trượt
-    slidingWindowFrequency(history) {
-        if (history.length < 10) return this.frequencyAnalysis(history);
-        const windows = [];
-        const windowSize = Math.min(10, history.length);
-        for (let i = 0; i < history.length - windowSize + 1; i++) {
-            windows.push(history.substring(i, i + windowSize));
-        }
-        const counts = { 'B': 0, 'P': 0, 'T': 0 };
-        for (const win of windows) {
-            const result = this.frequencyAnalysis(win);
-            counts[result.prediction] += result.confidence;
-        }
-        const pred = this.getMaxKey(counts);
-        const total = Object.values(counts).reduce((a, b) => a + b, 0);
-        const confidence = total > 0 ? counts[pred] / total : 0;
-        return {
-            prediction: pred,
-            confidence: Math.min(confidence * 1.1, 0.85),
-            windowCount: windows.length
-        };
-    }
-
-    // 1.4 Phân phối chuẩn
-    normalDistributionAnalysis(history) {
-        if (history.length < 10) return this.frequencyAnalysis(history);
-        const total = history.length;
-        const counts = { 'B': 0, 'P': 0, 'T': 0 };
-        for (const char of history) {
-            if (counts[char] !== undefined) counts[char]++;
-        }
-        const mean = total / 3;
-        const variance = Object.values(counts).reduce((a, b) => a + Math.pow(b - mean, 2), 0) / 3;
-        const stdDev = Math.sqrt(variance);
-        const zScores = {};
-        for (const [char, count] of Object.entries(counts)) {
-            zScores[char] = (count - mean) / (stdDev || 1);
-        }
-        // Dự đoán dựa trên độ lệch chuẩn lớn nhất
-        let maxZ = -Infinity;
-        let pred = 'B';
-        for (const [char, z] of Object.entries(zScores)) {
-            if (Math.abs(z) > maxZ) {
-                maxZ = Math.abs(z);
-                pred = char;
-            }
-        }
-        const confidence = Math.min(Math.abs(maxZ) / 2, 0.9);
-        return {
-            prediction: pred,
-            confidence: confidence,
-            zScores: zScores,
-            stdDev: stdDev
-        };
-    }
-
-    // ============================================================
-    // NHÓM 2: XU HƯỚNG (4 phương pháp)
-    // ============================================================
-
-    // 2.1 Xu hướng gần nhất
+    // ===== RECENT TREND =====
     recentTrendAnalysis(history) {
         const window = Math.min(this.config.recentWindow, history.length);
         const recent = history.slice(-window);
@@ -312,17 +169,12 @@ class AdvancedBaccaratPredictor {
             }
         }
         const pred = this.getMaxKey(weighted);
-        const confidence = weighted[pred] / (total * 0.7);
         return {
             prediction: pred,
-            confidence: Math.min(confidence, 0.9),
-            counts: counts,
-            weighted: weighted,
-            window: window
+            confidence: Math.min(weighted[pred] / (total * 0.7), 0.9)
         };
     }
 
-    // 2.2 Xu hướng có trọng số thời gian
     timeWeightedTrend(history) {
         if (history.length < 5) return this.recentTrendAnalysis(history);
         const weighted = { 'B': 0, 'P': 0, 'T': 0 };
@@ -333,81 +185,13 @@ class AdvancedBaccaratPredictor {
             if (weighted[char] !== undefined) weighted[char] += weight;
         }
         const pred = this.getMaxKey(weighted);
-        const confidence = weighted[pred] / (0.5);
         return {
             prediction: pred,
-            confidence: Math.min(confidence * 0.8, 0.85),
-            weighted: weighted
+            confidence: Math.min((weighted[pred] / 0.5) * 0.8, 0.85)
         };
     }
 
-    // 2.3 Xu hướng mũ
-    exponentialTrend(history) {
-        if (history.length < 5) return this.recentTrendAnalysis(history);
-        const alpha = 0.3;
-        const weighted = { 'B': 0, 'P': 0, 'T': 0 };
-        let totalWeight = 0;
-        for (let i = history.length - 1; i >= 0; i--) {
-            const char = history[i];
-            const weight = Math.pow(1 - alpha, history.length - 1 - i);
-            if (weighted[char] !== undefined) {
-                weighted[char] += weight;
-                totalWeight += weight;
-            }
-        }
-        for (const key of ['B', 'P', 'T']) {
-            if (weighted[key] !== undefined) weighted[key] /= totalWeight;
-        }
-        const pred = this.getMaxKey(weighted);
-        const confidence = weighted[pred] / 0.5;
-        return {
-            prediction: pred,
-            confidence: Math.min(confidence, 0.85),
-            weighted: weighted,
-            alpha: alpha
-        };
-    }
-
-    // 2.4 Đường xu hướng
-    trendlineAnalysis(history) {
-        if (history.length < 8) return this.recentTrendAnalysis(history);
-        const values = history.split('').map((c, i) => ({
-            x: i,
-            y: c === 'B' ? 1 : c === 'P' ? -1 : 0
-        }));
-        const n = values.length;
-        const sumX = values.reduce((a, b) => a + b.x, 0);
-        const sumY = values.reduce((a, b) => a + b.y, 0);
-        const sumXY = values.reduce((a, b) => a + b.x * b.y, 0);
-        const sumX2 = values.reduce((a, b) => a + b.x * b.x, 0);
-        const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
-        const intercept = (sumY - slope * sumX) / n;
-        const nextX = n;
-        const predictionValue = slope * nextX + intercept;
-        let pred = 'B';
-        let confidence = 0;
-        const rSquared = this.calculateRSquared(values, slope, intercept);
-        if (Math.abs(predictionValue) > 0.3) {
-            pred = predictionValue > 0 ? 'B' : 'P';
-            confidence = Math.min(Math.abs(predictionValue) * rSquared, 0.8);
-        } else {
-            pred = this.getMaxKeyCounts(history, ['B', 'P', 'T']);
-            confidence = 0.3;
-        }
-        return {
-            prediction: pred,
-            confidence: confidence,
-            slope: slope,
-            intercept: intercept,
-            rSquared: rSquared
-        };
-    }
-
-    // ============================================================
-    // NHÓM 3: PATTERN (9 phương pháp)
-    // ============================================================
-
-    // 3.1 Phân tích dây (Streak)
+    // ===== STREAK ANALYSIS =====
     streakAnalysis(history) {
         if (history.length < 2) return { prediction: 'B', confidence: 0 };
         let currentStreak = 1;
@@ -430,7 +214,6 @@ class AdvancedBaccaratPredictor {
         positions[history[history.length-1]].push(currentStreak);
         const lastChar = history[history.length - 1];
         const lastStreak = streaks[lastChar] || 1;
-        // Tính xác suất streak tiếp tục
         const avgStreak = positions[lastChar].reduce((a, b) => a + b, 0) / (positions[lastChar].length || 1);
         const continueProb = lastStreak / (avgStreak || 1);
         let pred = 'B';
@@ -439,7 +222,6 @@ class AdvancedBaccaratPredictor {
             pred = lastChar;
             confidence = Math.min(0.4 + lastStreak * 0.05, 0.8);
         } else if (lastStreak >= 5) {
-            // Đảo chiều
             const others = ['B', 'P', 'T'].filter(c => c !== lastChar);
             pred = others[0] || 'B';
             confidence = Math.min(0.3 + (lastStreak - 5) * 0.05, 0.7);
@@ -447,25 +229,16 @@ class AdvancedBaccaratPredictor {
             pred = this.getMaxKeyCounts(history, ['B', 'P', 'T']);
             confidence = 0.35;
         }
-        return {
-            prediction: pred,
-            confidence: confidence,
-            streaks: streaks,
-            lastStreak: lastStreak,
-            avgStreak: avgStreak,
-            continueProb: continueProb
-        };
+        return { prediction: pred, confidence: confidence };
     }
 
-    // 3.2 Phân tích Zigzag
+    // ===== ZIGZAG ANALYSIS =====
     zigzagAnalysis(history) {
         if (history.length < 3) return { prediction: 'B', confidence: 0 };
         let zigzagCount = 0;
-        const zigzagPatterns = [];
         for (let i = 1; i < history.length - 1; i++) {
             if (history[i] !== history[i-1] && history[i] !== history[i+1]) {
                 zigzagCount++;
-                zigzagPatterns.push(history[i]);
             }
         }
         let pred = 'B';
@@ -485,15 +258,10 @@ class AdvancedBaccaratPredictor {
             pred = this.getMaxKeyCounts(history, ['B', 'P', 'T']);
             confidence = 0.3;
         }
-        return {
-            prediction: pred,
-            confidence: Math.min(confidence, 0.85),
-            zigzagCount: zigzagCount,
-            zigzagPatterns: zigzagPatterns
-        };
+        return { prediction: pred, confidence: Math.min(confidence, 0.85) };
     }
 
-    // 3.3 Pattern lặp lại
+    // ===== REPEAT PATTERN =====
     repeatPatternAnalysis(history) {
         if (history.length < 4) return { prediction: 'B', confidence: 0 };
         const maxLen = Math.min(6, Math.floor(history.length / 2));
@@ -527,24 +295,16 @@ class AdvancedBaccaratPredictor {
             pred = this.getMaxKeyCounts(history, ['B', 'P', 'T']);
             confidence = 0.25;
         }
-        return {
-            prediction: pred,
-            confidence: confidence,
-            pattern: bestPattern,
-            count: bestCount,
-            length: bestLen
-        };
+        return { prediction: pred, confidence: confidence };
     }
 
-    // 3.4 Pattern 2-2
+    // ===== PATTERN 2-2 =====
     twoTwoPattern(history) {
         if (history.length < 6) return { prediction: 'B', confidence: 0 };
         let matchCount = 0;
-        const matches = [];
         for (let i = 1; i < Math.min(8, history.length - 1); i += 2) {
             if (history[history.length - i] === history[history.length - i - 1]) {
                 matchCount++;
-                matches.push(history[history.length - i]);
             }
         }
         let pred = 'B';
@@ -552,33 +312,21 @@ class AdvancedBaccaratPredictor {
         if (matchCount >= 2) {
             pred = history[history.length - 1];
             confidence = Math.min(0.45 + matchCount * 0.05, 0.75);
-            // Kiểm tra pattern 2-2-2-2
-            if (matchCount >= 4) {
-                confidence = Math.min(confidence + 0.1, 0.85);
-                pred = matches[0] === matches[1] ? 'B' : 'P';
-            }
         } else {
             pred = this.getMaxKeyCounts(history, ['B', 'P', 'T']);
             confidence = 0.25;
         }
-        return {
-            prediction: pred,
-            confidence: confidence,
-            matchCount: matchCount,
-            matches: matches
-        };
+        return { prediction: pred, confidence: confidence };
     }
 
-    // 3.5 Pattern 3-3
+    // ===== PATTERN 3-3 =====
     threeThreePattern(history) {
         if (history.length < 8) return { prediction: 'B', confidence: 0 };
         let matchCount = 0;
-        const matches = [];
         for (let i = 2; i < Math.min(9, history.length - 1); i += 3) {
             if (history[history.length - i] === history[history.length - i - 1] &&
                 history[history.length - i] === history[history.length - i - 2]) {
                 matchCount++;
-                matches.push(history[history.length - i]);
             }
         }
         let pred = 'B';
@@ -586,22 +334,14 @@ class AdvancedBaccaratPredictor {
         if (matchCount >= 2) {
             pred = history[history.length - 1];
             confidence = Math.min(0.45 + matchCount * 0.05, 0.75);
-            if (matchCount >= 3) {
-                confidence = Math.min(confidence + 0.1, 0.85);
-            }
         } else {
             pred = this.getMaxKeyCounts(history, ['B', 'P', 'T']);
             confidence = 0.25;
         }
-        return {
-            prediction: pred,
-            confidence: confidence,
-            matchCount: matchCount,
-            matches: matches
-        };
+        return { prediction: pred, confidence: confidence };
     }
 
-    // 3.6 Pattern 4-4
+    // ===== PATTERN 4-4 =====
     fourFourPattern(history) {
         if (history.length < 10) return { prediction: 'B', confidence: 0 };
         let matchCount = 0;
@@ -621,14 +361,10 @@ class AdvancedBaccaratPredictor {
             pred = this.getMaxKeyCounts(history, ['B', 'P', 'T']);
             confidence = 0.25;
         }
-        return {
-            prediction: pred,
-            confidence: confidence,
-            matchCount: matchCount
-        };
+        return { prediction: pred, confidence: confidence };
     }
 
-    // 3.7 Pattern 1-2-3
+    // ===== PATTERN 1-2-3 =====
     pattern123(history) {
         if (history.length < 10) return { prediction: 'B', confidence: 0 };
         let matchCount = 0;
@@ -654,14 +390,10 @@ class AdvancedBaccaratPredictor {
             pred = this.getMaxKeyCounts(history, ['B', 'P', 'T']);
             confidence = 0.25;
         }
-        return {
-            prediction: pred,
-            confidence: confidence,
-            matchCount: matchCount
-        };
+        return { prediction: pred, confidence: confidence };
     }
 
-    // 3.8 Pattern 2-1-2
+    // ===== PATTERN 2-1-2 =====
     pattern212(history) {
         if (history.length < 10) return { prediction: 'B', confidence: 0 };
         let matchCount = 0;
@@ -686,57 +418,10 @@ class AdvancedBaccaratPredictor {
             pred = this.getMaxKeyCounts(history, ['B', 'P', 'T']);
             confidence = 0.25;
         }
-        return {
-            prediction: pred,
-            confidence: confidence,
-            matchCount: matchCount
-        };
+        return { prediction: pred, confidence: confidence };
     }
 
-    // 3.9 Composite Pattern
-    compositePatternAnalysis(history) {
-        const results = [
-            this.streakAnalysis(history),
-            this.zigzagAnalysis(history),
-            this.repeatPatternAnalysis(history),
-            this.twoTwoPattern(history),
-            this.threeThreePattern(history),
-            this.fourFourPattern(history),
-            this.pattern123(history),
-            this.pattern212(history)
-        ];
-        const scores = { 'B': 0, 'P': 0, 'T': 0 };
-        const confidences = { 'B': 0, 'P': 0, 'T': 0 };
-        let totalWeight = 0;
-        for (const result of results) {
-            if (result && result.prediction && result.confidence) {
-                const weight = result.confidence;
-                scores[result.prediction] += weight * 10;
-                confidences[result.prediction] += weight;
-                totalWeight += weight;
-            }
-        }
-        let pred = 'B';
-        let maxScore = 0;
-        for (const char of ['B', 'P', 'T']) {
-            if (scores[char] > maxScore) {
-                maxScore = scores[char];
-                pred = char;
-            }
-        }
-        const confidence = totalWeight > 0 ? confidences[pred] / totalWeight : 0;
-        return {
-            prediction: pred,
-            confidence: Math.min(confidence * 1.2, 0.85),
-            patternCount: results.length
-        };
-    }
-
-    // ============================================================
-    // NHÓM 4: MARKOV (4 phương pháp)
-    // ============================================================
-
-    // 4.1 Markov bậc 1
+    // ===== MARKOV 1 =====
     markov1Analysis(history) {
         if (history.length < 2) return { prediction: 'B', confidence: 0 };
         for (let i = 0; i < history.length - 1; i++) {
@@ -760,17 +445,10 @@ class AdvancedBaccaratPredictor {
                 pred = char;
             }
         }
-        // Điều chỉnh confidence
-        const confidence = Math.min(maxProb * 1.3, 0.9);
-        return {
-            prediction: pred,
-            confidence: confidence,
-            matrix: transitions,
-            total: total
-        };
+        return { prediction: pred, confidence: Math.min(maxProb * 1.3, 0.9) };
     }
 
-    // 4.2 Markov bậc 2
+    // ===== MARKOV 2 =====
     markov2Analysis(history) {
         if (history.length < 3) return { prediction: 'B', confidence: 0 };
         for (let i = 0; i < history.length - 2; i++) {
@@ -797,16 +475,10 @@ class AdvancedBaccaratPredictor {
                 pred = char;
             }
         }
-        const confidence = Math.min(maxProb * 1.4, 0.9);
-        return {
-            prediction: pred,
-            confidence: confidence,
-            matrix: transitions,
-            total: total
-        };
+        return { prediction: pred, confidence: Math.min(maxProb * 1.4, 0.9) };
     }
 
-    // 4.3 Markov bậc 3
+    // ===== MARKOV 3 =====
     markov3Analysis(history) {
         if (history.length < 4) return { prediction: 'B', confidence: 0 };
         for (let i = 0; i < history.length - 3; i++) {
@@ -833,19 +505,12 @@ class AdvancedBaccaratPredictor {
                 pred = char;
             }
         }
-        const confidence = Math.min(maxProb * 1.5, 0.9);
-        return {
-            prediction: pred,
-            confidence: confidence,
-            matrix: transitions,
-            total: total
-        };
+        return { prediction: pred, confidence: Math.min(maxProb * 1.5, 0.9) };
     }
 
-    // 4.4 Markov Adaptive
+    // ===== MARKOV ADAPTIVE =====
     markovAdaptive(history) {
         if (history.length < 5) return this.markov1Analysis(history);
-        // Kết hợp cả 3 bậc
         const m1 = this.markov1Analysis(history);
         const m2 = this.markov2Analysis(history);
         const m3 = this.markov3Analysis(history);
@@ -870,18 +535,10 @@ class AdvancedBaccaratPredictor {
             }
         }
         const confidence = totalWeight > 0 ? confidences[pred] / totalWeight : 0;
-        return {
-            prediction: pred,
-            confidence: Math.min(confidence * 1.1, 0.9),
-            methods: [m1, m2, m3]
-        };
+        return { prediction: pred, confidence: Math.min(confidence * 1.1, 0.9) };
     }
 
-    // ============================================================
-    // NHÓM 5: XÁC SUẤT BAYES (3 phương pháp)
-    // ============================================================
-
-    // 5.1 Bayesian cơ bản
+    // ===== BAYESIAN =====
     bayesianAnalysis(history) {
         if (history.length < 5) return { prediction: 'B', confidence: 0.5 };
         const recent = history.slice(-10);
@@ -905,18 +562,12 @@ class AdvancedBaccaratPredictor {
                 pred = char;
             }
         }
-        const confidence = Math.min(maxPosterior * 1.3, 0.9);
-        return {
-            prediction: pred,
-            confidence: confidence,
-            posterior: posterior
-        };
+        return { prediction: pred, confidence: Math.min(maxPosterior * 1.3, 0.9) };
     }
 
-    // 5.2 Bayesian Adaptive
+    // ===== BAYESIAN ADAPTIVE =====
     bayesianAdaptive(history) {
         if (history.length < 10) return this.bayesianAnalysis(history);
-        // Cập nhật prior dựa trên dữ liệu mới
         const counts = { 'B': 0, 'P': 0, 'T': 0 };
         for (const char of history) {
             if (counts[char] !== undefined) counts[char]++;
@@ -948,27 +599,17 @@ class AdvancedBaccaratPredictor {
                 pred = char;
             }
         }
-        const confidence = Math.min(maxPost * 1.4, 0.9);
-        return {
-            prediction: pred,
-            confidence: confidence,
-            posterior: posterior,
-            prior: this.prior_adaptive
-        };
+        return { prediction: pred, confidence: Math.min(maxPost * 1.4, 0.9) };
     }
 
-    // 5.3 Posterior Probability
+    // ===== POSTERIOR PROBABILITY =====
     posteriorProbability(history) {
         if (history.length < 10) return this.bayesianAnalysis(history);
         const predictions = [];
-        const windows = [];
         const windowSize = Math.min(10, history.length);
         for (let i = 0; i < history.length - windowSize + 1; i++) {
-            windows.push(history.substring(i, i + windowSize));
-        }
-        for (const win of windows) {
-            const result = this.bayesianAdaptive(win);
-            predictions.push(result);
+            const win = history.substring(i, i + windowSize);
+            predictions.push(this.bayesianAdaptive(win));
         }
         const scores = { 'B': 0, 'P': 0, 'T': 0 };
         const confidences = { 'B': 0, 'P': 0, 'T': 0 };
@@ -988,18 +629,10 @@ class AdvancedBaccaratPredictor {
         }
         const totalConf = Object.values(confidences).reduce((a, b) => a + b, 0);
         const confidence = totalConf > 0 ? confidences[pred] / totalConf : 0;
-        return {
-            prediction: pred,
-            confidence: Math.min(confidence * 1.2, 0.85),
-            predictions: predictions
-        };
+        return { prediction: pred, confidence: Math.min(confidence * 1.2, 0.85) };
     }
 
-    // ============================================================
-    // NHÓM 6: NEURAL NETWORK (3 phương pháp)
-    // ============================================================
-
-    // 6.1 Neural Network cơ bản
+    // ===== NEURAL NETWORK =====
     neuralAnalysis(history) {
         if (history.length < 10) return { prediction: 'B', confidence: 0.5 };
         const nGrams = { 1: {}, 2: {}, 3: {}, 4: {} };
@@ -1025,7 +658,6 @@ class AdvancedBaccaratPredictor {
         const last4 = history.slice(-4);
         const scores = { 'B': 0, 'P': 0, 'T': 0 };
         const weights = this.neural.weights1;
-        // 1-gram
         if (nGrams[1][last1]) {
             const total = nGrams[1][last1].count;
             for (const [next, count] of Object.entries(nGrams[1][last1].next)) {
@@ -1033,7 +665,6 @@ class AdvancedBaccaratPredictor {
                 scores[next] += prob * weights['B'][next] * 0.3;
             }
         }
-        // 2-gram
         if (nGrams[2][last2]) {
             const total = nGrams[2][last2].count;
             for (const [next, count] of Object.entries(nGrams[2][last2].next)) {
@@ -1041,7 +672,6 @@ class AdvancedBaccaratPredictor {
                 scores[next] += prob * weights['P'][next] * 0.5;
             }
         }
-        // 3-gram
         if (nGrams[3][last3]) {
             const total = nGrams[3][last3].count;
             for (const [next, count] of Object.entries(nGrams[3][last3].next)) {
@@ -1049,7 +679,6 @@ class AdvancedBaccaratPredictor {
                 scores[next] += prob * weights['T'][next] * 0.7;
             }
         }
-        // 4-gram
         if (nGrams[4][last4]) {
             const total = nGrams[4][last4].count;
             for (const [next, count] of Object.entries(nGrams[4][last4].next)) {
@@ -1065,23 +694,15 @@ class AdvancedBaccaratPredictor {
                 pred = char;
             }
         }
-        const confidence = Math.min(maxScore / 2, 0.9);
-        return {
-            prediction: pred,
-            confidence: confidence,
-            scores: scores,
-            nGrams: Object.keys(nGrams[1]).length + Object.keys(nGrams[2]).length
-        };
+        return { prediction: pred, confidence: Math.min(maxScore / 2, 0.9) };
     }
 
-    // 6.2 Deep Neural Network
+    // ===== DEEP NEURAL =====
     deepNeuralAnalysis(history) {
         if (history.length < 15) return this.neuralAnalysis(history);
-        // 2 hidden layers
         const input = { 'B': 0, 'P': 0, 'T': 0 };
         const weights = this.neural.weights1;
         const weights2 = this.neural.weights2;
-        // Input layer
         const counts = { 'B': 0, 'P': 0, 'T': 0 };
         for (const char of history) {
             if (counts[char] !== undefined) counts[char]++;
@@ -1090,7 +711,6 @@ class AdvancedBaccaratPredictor {
         for (const char of ['B', 'P', 'T']) {
             input[char] = counts[char] / total;
         }
-        // Hidden layer 1
         const hidden1 = { 'B': 0, 'P': 0, 'T': 0 };
         for (const out of ['B', 'P', 'T']) {
             let sum = 0;
@@ -1099,7 +719,6 @@ class AdvancedBaccaratPredictor {
             }
             hidden1[out] = this.sigmoid(sum + this.neural.bias1[out]);
         }
-        // Hidden layer 2
         const hidden2 = { 'B': 0, 'P': 0, 'T': 0 };
         for (const out of ['B', 'P', 'T']) {
             let sum = 0;
@@ -1108,7 +727,6 @@ class AdvancedBaccaratPredictor {
             }
             hidden2[out] = this.sigmoid(sum + this.neural.bias2[out]);
         }
-        // Output
         let maxOutput = 0;
         let pred = 'B';
         for (const char of ['B', 'P', 'T']) {
@@ -1117,20 +735,12 @@ class AdvancedBaccaratPredictor {
                 pred = char;
             }
         }
-        const confidence = Math.min(maxOutput * 1.5, 0.9);
-        return {
-            prediction: pred,
-            confidence: confidence,
-            hidden1: hidden1,
-            hidden2: hidden2,
-            output: hidden2
-        };
+        return { prediction: pred, confidence: Math.min(maxOutput * 1.5, 0.9) };
     }
 
-    // 6.3 LSTM-like Analysis
+    // ===== LSTM =====
     lstmAnalysis(history) {
         if (history.length < 20) return this.neuralAnalysis(history);
-        // Simulate LSTM with sliding windows
         const windowSize = 10;
         const windows = [];
         for (let i = 0; i < history.length - windowSize + 1; i++) {
@@ -1138,8 +748,7 @@ class AdvancedBaccaratPredictor {
         }
         const results = [];
         for (const win of windows) {
-            const result = this.deepNeuralAnalysis(win);
-            results.push(result);
+            results.push(this.deepNeuralAnalysis(win));
         }
         const scores = { 'B': 0, 'P': 0, 'T': 0 };
         const confidences = { 'B': 0, 'P': 0, 'T': 0 };
@@ -1160,18 +769,10 @@ class AdvancedBaccaratPredictor {
         }
         const totalConf = Object.values(confidences).reduce((a, b) => a + b, 0);
         const confidence = totalConf > 0 ? confidences[pred] / totalConf : 0;
-        return {
-            prediction: pred,
-            confidence: Math.min(confidence * 1.1, 0.85),
-            windows: windows.length
-        };
+        return { prediction: pred, confidence: Math.min(confidence * 1.1, 0.85) };
     }
 
-    // ============================================================
-    // NHÓM 7: PHÂN TÍCH CHUỖI (4 phương pháp)
-    // ============================================================
-
-    // 7.1 Gap Analysis
+    // ===== GAP ANALYSIS =====
     gapAnalysis(history) {
         const gaps = { 'B': [], 'P': [], 'T': [] };
         const lastPos = { 'B': -1, 'P': -1, 'T': -1 };
@@ -1183,15 +784,11 @@ class AdvancedBaccaratPredictor {
             lastPos[char] = i;
         }
         const avgGaps = {};
-        const stdGaps = {};
         for (const char of ['B', 'P', 'T']) {
             if (gaps[char].length > 0) {
                 avgGaps[char] = gaps[char].reduce((a, b) => a + b, 0) / gaps[char].length;
-                const variance = gaps[char].reduce((a, b) => a + Math.pow(b - avgGaps[char], 2), 0) / gaps[char].length;
-                stdGaps[char] = Math.sqrt(variance);
             } else {
                 avgGaps[char] = 2;
-                stdGaps[char] = 1;
             }
         }
         const currentGap = {};
@@ -1204,8 +801,7 @@ class AdvancedBaccaratPredictor {
                 scores[char] = 0.1;
             } else {
                 const ratio = currentGap[char] / (avgGaps[char] || 1);
-                const zScore = (currentGap[char] - avgGaps[char]) / (stdGaps[char] || 1);
-                scores[char] = Math.min(ratio * (1 + Math.abs(zScore) * 0.1), 1);
+                scores[char] = Math.min(ratio, 1);
             }
         }
         let maxScore = 0;
@@ -1216,25 +812,13 @@ class AdvancedBaccaratPredictor {
                 pred = char;
             }
         }
-        const confidence = Math.min(maxScore * 0.8, 0.85);
-        return {
-            prediction: pred,
-            confidence: confidence,
-            gaps: currentGap,
-            avgGaps: avgGaps,
-            stdGaps: stdGaps,
-            zScores: {}
-        };
+        return { prediction: pred, confidence: Math.min(maxScore * 0.8, 0.85) };
     }
 
-    // 7.2 Correlation Analysis
+    // ===== CORRELATION =====
     correlationAnalysis(history) {
         if (history.length < 10) return { prediction: 'B', confidence: 0.5 };
-        const sequence = history.split('').map(c => {
-            if (c === 'B') return 1;
-            if (c === 'P') return -1;
-            return 0;
-        });
+        const sequence = history.split('').map(c => c === 'B' ? 1 : c === 'P' ? -1 : 0);
         const n = sequence.length;
         const mean = sequence.reduce((a, b) => a + b, 0) / n;
         const variance = sequence.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / n;
@@ -1249,7 +833,6 @@ class AdvancedBaccaratPredictor {
         const lastValue = sequence[n - 1];
         let predictedValue = lastValue;
         let confidence = 0.5;
-        // Phân tích correlation
         let positiveCount = correlations.filter(c => c > 0.2).length;
         let negativeCount = correlations.filter(c => c < -0.2).length;
         if (positiveCount > negativeCount + 1) {
@@ -1263,25 +846,14 @@ class AdvancedBaccaratPredictor {
         if (predictedValue > 0) pred = 'B';
         else if (predictedValue < 0) pred = 'P';
         else pred = 'T';
-        return {
-            prediction: pred,
-            confidence: confidence,
-            correlations: correlations,
-            positiveCount: positiveCount,
-            negativeCount: negativeCount
-        };
+        return { prediction: pred, confidence: confidence };
     }
 
-    // 7.3 Autocorrelation
+    // ===== AUTOCORRELATION =====
     autocorrelationAnalysis(history) {
         if (history.length < 15) return this.correlationAnalysis(history);
         const result = this.correlationAnalysis(history);
-        // Phân tích thêm autocorrelation
-        const sequence = history.split('').map(c => {
-            if (c === 'B') return 1;
-            if (c === 'P') return -1;
-            return 0;
-        });
+        const sequence = history.split('').map(c => c === 'B' ? 1 : c === 'P' ? -1 : 0);
         const n = sequence.length;
         const mean = sequence.reduce((a, b) => a + b, 0) / n;
         const acf = [];
@@ -1292,7 +864,6 @@ class AdvancedBaccaratPredictor {
             }
             acf.push(sum / ((n - lag) * n));
         }
-        // Tìm period
         let period = 0;
         let maxACF = 0;
         for (let i = 0; i < acf.length; i++) {
@@ -1308,22 +879,14 @@ class AdvancedBaccaratPredictor {
             if (nextValue > 0) pred = 'B';
             else if (nextValue < 0) pred = 'P';
             else pred = 'T';
-            const confidence = Math.min(maxACF * 0.8 + 0.2, 0.85);
-            return {
-                prediction: pred,
-                confidence: confidence,
-                period: period,
-                acf: acf,
-                maxACF: maxACF
-            };
+            return { prediction: pred, confidence: Math.min(maxACF * 0.8 + 0.2, 0.85) };
         }
         return result;
     }
 
-    // 7.4 Cross Correlation
+    // ===== CROSS CORRELATION =====
     crossCorrelationAnalysis(history) {
         if (history.length < 20) return this.correlationAnalysis(history);
-        // Phân tích tương quan chéo giữa các cửa
         const sequence = history.split('');
         const crossCorr = {};
         for (const c1 of ['B', 'P', 'T']) {
@@ -1343,7 +906,6 @@ class AdvancedBaccaratPredictor {
                 }
             }
         }
-        // Dự đoán dựa trên cross correlation
         const lastChar = history[history.length - 1];
         const scores = { 'B': 0, 'P': 0, 'T': 0 };
         for (const char of ['B', 'P', 'T']) {
@@ -1366,19 +928,10 @@ class AdvancedBaccaratPredictor {
                 pred = char;
             }
         }
-        const confidence = Math.min(maxScore, 0.8);
-        return {
-            prediction: pred,
-            confidence: confidence,
-            crossCorr: crossCorr
-        };
+        return { prediction: pred, confidence: Math.min(maxScore, 0.8) };
     }
 
-    // ============================================================
-    // NHÓM 8: ENTROPY (3 phương pháp)
-    // ============================================================
-
-    // 8.1 Entropy Analysis
+    // ===== ENTROPY =====
     entropyAnalysis(history) {
         if (history.length < 5) return { prediction: 'B', confidence: 0 };
         const counts = { 'B': 0, 'P': 0, 'T': 0 };
@@ -1404,72 +957,54 @@ class AdvancedBaccaratPredictor {
             pred = this.getMaxKeyCounts(history, ['B', 'P', 'T']);
             confidence = 0.4;
         } else {
-            // Entropy cao, khó dự đoán
             pred = this.getMaxKeyCounts(history, ['B', 'P', 'T']);
             confidence = 0.3;
         }
-        return {
-            prediction: pred,
-            confidence: confidence,
-            entropy: entropy,
-            predictability: predictability
-        };
+        return { prediction: pred, confidence: confidence };
     }
 
-    // 8.2 Adaptive Entropy
+    // ===== ADAPTIVE ENTROPY =====
     adaptiveEntropy(history) {
         if (history.length < 10) return this.entropyAnalysis(history);
-        const windows = [];
         const windowSize = Math.min(10, history.length);
+        const windows = [];
         for (let i = 0; i < history.length - windowSize + 1; i++) {
             windows.push(history.substring(i, i + windowSize));
         }
         const entropies = [];
         for (const win of windows) {
-            const result = this.entropyAnalysis(win);
-            entropies.push(result);
+            entropies.push(this.entropyAnalysis(win));
         }
-        // Tính entropy trung bình và độ lệch
         const avgEntropy = entropies.reduce((a, b) => a + b.entropy, 0) / entropies.length;
         const lastEntropy = entropies[entropies.length - 1].entropy;
         const entropyDiff = lastEntropy - avgEntropy;
         let pred = 'B';
         let confidence = 0;
         if (entropyDiff < -0.2) {
-            // Entropy giảm => dễ dự đoán hơn
             const result = this.frequencyAnalysis(history);
             pred = result.prediction;
             confidence = Math.min(result.confidence * 1.2, 0.85);
         } else if (entropyDiff > 0.2) {
-            // Entropy tăng => khó dự đoán
             const result = this.recentTrendAnalysis(history);
             pred = result.prediction;
             confidence = result.confidence * 0.8;
         } else {
-            const result = this.compositePatternAnalysis(history);
+            const result = this.frequencyAnalysis(history);
             pred = result.prediction;
             confidence = result.confidence;
         }
-        return {
-            prediction: pred,
-            confidence: confidence,
-            avgEntropy: avgEntropy,
-            lastEntropy: lastEntropy,
-            entropyDiff: entropyDiff
-        };
+        return { prediction: pred, confidence: confidence };
     }
 
-    // 8.3 Information Gain
+    // ===== INFORMATION GAIN =====
     informationGain(history) {
         if (history.length < 10) return this.entropyAnalysis(history);
-        // Tính information gain cho từng vị trí
         const gains = [];
         for (let pos = 0; pos < Math.min(5, history.length - 1); pos++) {
             const entropy = this.entropyAnalysis(history).entropy;
             const conditionalEntropy = this.calculateConditionalEntropy(history, pos);
             gains.push(entropy - conditionalEntropy);
         }
-        // Dự đoán dựa trên vị trí có information gain cao nhất
         let maxGain = 0;
         let bestPos = 0;
         for (let i = 0; i < gains.length; i++) {
@@ -1495,20 +1030,10 @@ class AdvancedBaccaratPredictor {
             pred = this.getMaxKeyCounts(history, ['B', 'P', 'T']);
             confidence = 0.3;
         }
-        return {
-            prediction: pred,
-            confidence: confidence,
-            gains: gains,
-            bestPosition: bestPos,
-            maxGain: maxGain
-        };
+        return { prediction: pred, confidence: confidence };
     }
 
-    // ============================================================
-    // NHÓM 9: ĐỘNG LƯỢNG (3 phương pháp)
-    // ============================================================
-
-    // 9.1 Momentum Analysis
+    // ===== MOMENTUM =====
     momentumAnalysis(history) {
         if (history.length < 5) return { prediction: 'B', confidence: 0 };
         const recent = history.slice(-5);
@@ -1526,15 +1051,10 @@ class AdvancedBaccaratPredictor {
             pred = this.getMaxKeyCounts(history, ['B', 'P', 'T']);
             confidence = 0.3;
         }
-        return {
-            prediction: pred,
-            confidence: confidence,
-            momentum: momentum,
-            values: values
-        };
+        return { prediction: pred, confidence: confidence };
     }
 
-    // 9.2 Adaptive Momentum
+    // ===== ADAPTIVE MOMENTUM =====
     adaptiveMomentum(history) {
         if (history.length < 10) return this.momentumAnalysis(history);
         const momentums = [];
@@ -1555,16 +1075,10 @@ class AdvancedBaccaratPredictor {
             pred = this.getMaxKeyCounts(history, ['B', 'P', 'T']);
             confidence = 0.3;
         }
-        return {
-            prediction: pred,
-            confidence: confidence,
-            avgMomentum: avgMomentum,
-            lastMomentum: lastMomentum,
-            momentumDiff: momentumDiff
-        };
+        return { prediction: pred, confidence: confidence };
     }
 
-    // 9.3 Acceleration
+    // ===== ACCELERATION =====
     accelerationAnalysis(history) {
         if (history.length < 10) return this.momentumAnalysis(history);
         const values = history.split('').map(c => c === 'B' ? 1 : c === 'P' ? -1 : 0);
@@ -1581,7 +1095,6 @@ class AdvancedBaccaratPredictor {
         let pred = 'B';
         let confidence = 0;
         if (Math.abs(lastAcceleration) > Math.abs(avgAcceleration) * 1.5) {
-            // Gia tốc đang tăng
             const lastValue = values[values.length - 1];
             pred = lastValue > 0 ? 'B' : 'P';
             confidence = Math.min(Math.abs(lastAcceleration) / 3, 0.8);
@@ -1589,26 +1102,13 @@ class AdvancedBaccaratPredictor {
             pred = this.getMaxKeyCounts(history, ['B', 'P', 'T']);
             confidence = 0.3;
         }
-        return {
-            prediction: pred,
-            confidence: confidence,
-            acceleration: lastAcceleration,
-            avgAcceleration: avgAcceleration,
-            velocities: velocities
-        };
+        return { prediction: pred, confidence: confidence };
     }
 
-    // ============================================================
-    // NHÓM 10: HỒI QUY (3 phương pháp)
-    // ============================================================
-
-    // 10.1 Linear Regression
+    // ===== REGRESSION =====
     regressionAnalysis(history) {
         if (history.length < 10) return { prediction: 'B', confidence: 0 };
-        const values = history.split('').map((c, i) => ({
-            x: i,
-            y: c === 'B' ? 1 : c === 'P' ? -1 : 0
-        }));
+        const values = history.split('').map((c, i) => ({ x: i, y: c === 'B' ? 1 : c === 'P' ? -1 : 0 }));
         const n = values.length;
         const sumX = values.reduce((a, b) => a + b.x, 0);
         const sumY = values.reduce((a, b) => a + b.y, 0);
@@ -1628,25 +1128,17 @@ class AdvancedBaccaratPredictor {
             pred = this.getMaxKeyCounts(history, ['B', 'P', 'T']);
             confidence = 0.3;
         }
-        return {
-            prediction: pred,
-            confidence: confidence,
-            slope: slope,
-            intercept: intercept,
-            rSquared: rSquared,
-            predictionValue: predictionValue
-        };
+        return { prediction: pred, confidence: confidence };
     }
 
-    // 10.2 Adaptive Regression
+    // ===== ADAPTIVE REGRESSION =====
     adaptiveRegression(history) {
         if (history.length < 15) return this.regressionAnalysis(history);
         const results = [];
         const windowSize = Math.min(10, history.length);
         for (let i = windowSize; i < history.length; i++) {
             const subHistory = history.substring(0, i);
-            const result = this.regressionAnalysis(subHistory);
-            results.push(result);
+            results.push(this.regressionAnalysis(subHistory));
         }
         const avgSlope = results.reduce((a, b) => a + b.slope, 0) / results.length;
         const lastSlope = results[results.length - 1]?.slope || 0;
@@ -1660,24 +1152,14 @@ class AdvancedBaccaratPredictor {
             pred = this.getMaxKeyCounts(history, ['B', 'P', 'T']);
             confidence = 0.3;
         }
-        return {
-            prediction: pred,
-            confidence: confidence,
-            avgSlope: avgSlope,
-            lastSlope: lastSlope,
-            slopeDiff: slopeDiff
-        };
+        return { prediction: pred, confidence: confidence };
     }
 
-    // 10.3 Polynomial Regression
+    // ===== POLYNOMIAL REGRESSION =====
     polynomialRegression(history) {
         if (history.length < 15) return this.regressionAnalysis(history);
-        const values = history.split('').map((c, i) => ({
-            x: i,
-            y: c === 'B' ? 1 : c === 'P' ? -1 : 0
-        }));
+        const values = history.split('').map((c, i) => ({ x: i, y: c === 'B' ? 1 : c === 'P' ? -1 : 0 }));
         const n = values.length;
-        // Bậc 2
         const sumX = values.reduce((a, b) => a + b.x, 0);
         const sumX2 = values.reduce((a, b) => a + b.x * b.x, 0);
         const sumX3 = values.reduce((a, b) => a + b.x * b.x * b.x, 0);
@@ -1685,7 +1167,6 @@ class AdvancedBaccaratPredictor {
         const sumY = values.reduce((a, b) => a + b.y, 0);
         const sumXY = values.reduce((a, b) => a + b.x * b.y, 0);
         const sumX2Y = values.reduce((a, b) => a + b.x * b.x * b.y, 0);
-        // Giải hệ phương trình bậc 2
         const det = n * sumX2 * sumX4 + sumX * sumX3 * sumX2 + sumX2 * sumX * sumX3 -
                    sumX2 * sumX2 * sumX2 - sumX * sumX * sumX4 - n * sumX3 * sumX3;
         if (det === 0) return this.regressionAnalysis(history);
@@ -1709,21 +1190,10 @@ class AdvancedBaccaratPredictor {
             pred = this.getMaxKeyCounts(history, ['B', 'P', 'T']);
             confidence = 0.3;
         }
-        return {
-            prediction: pred,
-            confidence: confidence,
-            a: a,
-            b: b,
-            c: c,
-            predictionValue: predictionValue
-        };
+        return { prediction: pred, confidence: confidence };
     }
 
-    // ============================================================
-    // NHÓM 11: PHÂN CỤM (3 phương pháp)
-    // ============================================================
-
-    // 11.1 Cluster Analysis
+    // ===== CLUSTER =====
     clusterAnalysis(history) {
         if (history.length < 8) return { prediction: 'B', confidence: 0 };
         const clusters = { 'B': [], 'P': [], 'T': [] };
@@ -1744,15 +1214,11 @@ class AdvancedBaccaratPredictor {
             clusters[currentChar].push(currentCluster.length);
         }
         const avgSizes = {};
-        const stdSizes = {};
         for (const char of ['B', 'P', 'T']) {
             if (clusters[char].length > 0) {
                 avgSizes[char] = clusters[char].reduce((a, b) => a + b, 0) / clusters[char].length;
-                const variance = clusters[char].reduce((a, b) => a + Math.pow(b - avgSizes[char], 2), 0) / clusters[char].length;
-                stdSizes[char] = Math.sqrt(variance);
             } else {
                 avgSizes[char] = 0;
-                stdSizes[char] = 0;
             }
         }
         let pred = 'B';
@@ -1763,31 +1229,21 @@ class AdvancedBaccaratPredictor {
                 pred = char;
             }
         }
-        const confidence = Math.min(maxSize / 4, 0.8);
-        return {
-            prediction: pred,
-            confidence: confidence,
-            avgSizes: avgSizes,
-            stdSizes: stdSizes,
-            clusters: clusters
-        };
+        return { prediction: pred, confidence: Math.min(maxSize / 4, 0.8) };
     }
 
-    // 11.2 Hierarchical Clustering
+    // ===== HIERARCHICAL CLUSTER =====
     hierarchicalCluster(history) {
         if (history.length < 12) return this.clusterAnalysis(history);
-        // Phân tích hierarchical
-        const windows = [];
         const windowSize = Math.min(8, history.length);
+        const windows = [];
         for (let i = 0; i < history.length - windowSize + 1; i++) {
             windows.push(history.substring(i, i + windowSize));
         }
         const results = [];
         for (const win of windows) {
-            const result = this.clusterAnalysis(win);
-            results.push(result);
+            results.push(this.clusterAnalysis(win));
         }
-        const avgConfidence = results.reduce((a, b) => a + b.confidence, 0) / results.length;
         const predictions = results.map(r => r.prediction);
         const counts = { 'B': 0, 'P': 0, 'T': 0 };
         for (const pred of predictions) {
@@ -1801,28 +1257,19 @@ class AdvancedBaccaratPredictor {
                 pred = char;
             }
         }
-        const confidence = Math.min(maxCount / results.length * 1.2, 0.85);
-        return {
-            prediction: pred,
-            confidence: confidence,
-            clusterCount: results.length,
-            distribution: counts
-        };
+        return { prediction: pred, confidence: Math.min(maxCount / results.length * 1.2, 0.85) };
     }
 
-    // 11.3 Density-based Clustering
+    // ===== DENSITY CLUSTER =====
     densityCluster(history) {
         if (history.length < 10) return this.clusterAnalysis(history);
-        // Tìm mật độ xuất hiện
         const density = {};
         const windowSize = 5;
         for (let i = 0; i < history.length - windowSize + 1; i++) {
-            const sub = history.substring(i, i + windowSize);
-            const key = sub;
+            const key = history.substring(i, i + windowSize);
             if (!density[key]) density[key] = 0;
             density[key]++;
         }
-        // Tìm vùng mật độ cao
         let maxDensity = 0;
         let densePattern = '';
         for (const [pattern, count] of Object.entries(density)) {
@@ -1834,205 +1281,16 @@ class AdvancedBaccaratPredictor {
         let pred = 'B';
         let confidence = 0;
         if (densePattern && maxDensity > 2) {
-            const lastChar = densePattern[densePattern.length - 1];
-            pred = lastChar;
+            pred = densePattern[densePattern.length - 1];
             confidence = Math.min(maxDensity / 5, 0.8);
         } else {
             pred = this.getMaxKeyCounts(history, ['B', 'P', 'T']);
             confidence = 0.25;
         }
-        return {
-            prediction: pred,
-            confidence: confidence,
-            maxDensity: maxDensity,
-            densePattern: densePattern
-        };
+        return { prediction: pred, confidence: confidence };
     }
 
-    // ============================================================
-    // NHÓM 12: PHÂN TÍCH KỸ THUẬT (4 phương pháp)
-    // ============================================================
-
-    // 12.1 Support & Resistance
-    supportResistance(history) {
-        if (history.length < 10) return { prediction: 'B', confidence: 0 };
-        const values = history.split('').map(c => c === 'B' ? 1 : c === 'P' ? -1 : 0);
-        // Tìm support (điểm thấp) và resistance (điểm cao)
-        const supports = [];
-        const resistances = [];
-        for (let i = 2; i < values.length - 2; i++) {
-            if (values[i] < values[i-1] && values[i] < values[i-2] &&
-                values[i] < values[i+1] && values[i] < values[i+2]) {
-                supports.push({ index: i, value: values[i] });
-            }
-            if (values[i] > values[i-1] && values[i] > values[i-2] &&
-                values[i] > values[i+1] && values[i] > values[i+2]) {
-                resistances.push({ index: i, value: values[i] });
-            }
-        }
-        const lastValue = values[values.length - 1];
-        let pred = 'B';
-        let confidence = 0;
-        if (supports.length > 0 && resistances.length > 0) {
-            const lastSupport = supports[supports.length - 1];
-            const lastResistance = resistances[resistances.length - 1];
-            if (lastValue <= lastSupport.value + 0.2) {
-                // Gần support -> bounce up
-                pred = 'B';
-                confidence = 0.6;
-            } else if (lastValue >= lastResistance.value - 0.2) {
-                // Gần resistance -> bounce down
-                pred = 'P';
-                confidence = 0.6;
-            } else {
-                pred = this.getMaxKeyCounts(history, ['B', 'P', 'T']);
-                confidence = 0.3;
-            }
-        } else {
-            pred = this.getMaxKeyCounts(history, ['B', 'P', 'T']);
-            confidence = 0.25;
-        }
-        return {
-            prediction: pred,
-            confidence: confidence,
-            supports: supports,
-            resistances: resistances
-        };
-    }
-
-    // 12.2 Pivot Points
-    pivotAnalysis(history) {
-        if (history.length < 10) return this.supportResistance(history);
-        const values = history.split('').map(c => c === 'B' ? 1 : c === 'P' ? -1 : 0);
-        const n = values.length;
-        const high = Math.max(...values);
-        const low = Math.min(...values);
-        const close = values[n - 1];
-        const pivot = (high + low + close) / 3;
-        const r1 = 2 * pivot - low;
-        const s1 = 2 * pivot - high;
-        let pred = 'B';
-        let confidence = 0;
-        if (close > pivot) {
-            pred = 'B';
-            confidence = Math.min((close - pivot) / (r1 - pivot || 1), 0.7);
-        } else if (close < pivot) {
-            pred = 'P';
-            confidence = Math.min((pivot - close) / (pivot - s1 || 1), 0.7);
-        } else {
-            pred = this.getMaxKeyCounts(history, ['B', 'P', 'T']);
-            confidence = 0.3;
-        }
-        return {
-            prediction: pred,
-            confidence: confidence,
-            pivot: pivot,
-            r1: r1,
-            s1: s1,
-            close: close
-        };
-    }
-
-    // 12.3 Fibonacci Retracement
-    fibonacciAnalysis(history) {
-        if (history.length < 10) return { prediction: 'B', confidence: 0 };
-        const values = history.split('').map(c => c === 'B' ? 1 : c === 'P' ? -1 : 0);
-        const high = Math.max(...values);
-        const low = Math.min(...values);
-        const diff = high - low;
-        const levels = {
-            '0.236': high - diff * 0.236,
-            '0.382': high - diff * 0.382,
-            '0.5': high - diff * 0.5,
-            '0.618': high - diff * 0.618,
-            '0.786': high - diff * 0.786
-        };
-        const lastValue = values[values.length - 1];
-        let pred = 'B';
-        let confidence = 0;
-        // Xác định vị trí hiện tại
-        let currentLevel = 0;
-        for (const [level, value] of Object.entries(levels)) {
-            if (Math.abs(lastValue - value) < 0.1) {
-                currentLevel = parseFloat(level);
-                break;
-            }
-        }
-        if (currentLevel > 0) {
-            if (currentLevel < 0.5) {
-                // Ở dưới 0.5 -> tăng
-                pred = 'B';
-                confidence = 0.6;
-            } else if (currentLevel > 0.5) {
-                // Ở trên 0.5 -> giảm
-                pred = 'P';
-                confidence = 0.6;
-            }
-        } else {
-            pred = this.getMaxKeyCounts(history, ['B', 'P', 'T']);
-            confidence = 0.3;
-        }
-        return {
-            prediction: pred,
-            confidence: confidence,
-            levels: levels,
-            currentLevel: currentLevel,
-            lastValue: lastValue
-        };
-    }
-
-    // 12.4 Harmonic Patterns
-    harmonicPattern(history) {
-        if (history.length < 12) return this.supportResistance(history);
-        // Tìm harmonic patterns (AB=CD, Gartley, etc.)
-        const values = history.split('').map(c => c === 'B' ? 1 : c === 'P' ? -1 : 0);
-        const peaks = [];
-        const troughs = [];
-        for (let i = 2; i < values.length - 2; i++) {
-            if (values[i] > values[i-1] && values[i] > values[i-2] &&
-                values[i] > values[i+1] && values[i] > values[i+2]) {
-                peaks.push({ index: i, value: values[i] });
-            }
-            if (values[i] < values[i-1] && values[i] < values[i-2] &&
-                values[i] < values[i+1] && values[i] < values[i+2]) {
-                troughs.push({ index: i, value: values[i] });
-            }
-        }
-        // Tìm AB=CD pattern
-        if (peaks.length >= 2 && troughs.length >= 2) {
-            const lastPeak = peaks[peaks.length - 1];
-            const lastTrough = troughs[troughs.length - 1];
-            const prevPeak = peaks[peaks.length - 2];
-            const prevTrough = troughs[troughs.length - 2];
-            const ab = Math.abs(prevPeak.value - prevTrough.value);
-            const cd = Math.abs(lastPeak.value - lastTrough.value);
-            if (Math.abs(ab - cd) < 0.1) {
-                let pred = 'B';
-                let confidence = 0;
-                if (lastPeak.index > lastTrough.index) {
-                    pred = 'P';
-                    confidence = 0.65;
-                } else {
-                    pred = 'B';
-                    confidence = 0.65;
-                }
-                return {
-                    prediction: pred,
-                    confidence: confidence,
-                    pattern: 'AB=CD',
-                    ab: ab,
-                    cd: cd
-                };
-            }
-        }
-        return this.supportResistance(history);
-    }
-
-    // ============================================================
-    // NHÓM 13: PHÂN TÍCH KHÁC (3 phương pháp)
-    // ============================================================
-
-    // 13.1 Pair Analysis
+    // ===== PAIR =====
     pairAnalysis(history) {
         if (history.length < 4) return { prediction: 'B', confidence: 0 };
         const pairs = {};
@@ -2060,16 +1318,10 @@ class AdvancedBaccaratPredictor {
                 pred = char;
             }
         }
-        const confidence = Math.min(maxCount / 5, 0.8);
-        return {
-            prediction: pred,
-            confidence: confidence,
-            pairs: pairs,
-            lastPair: lastPair
-        };
+        return { prediction: pred, confidence: Math.min(maxCount / 5, 0.8) };
     }
 
-    // 13.2 Triple Analysis
+    // ===== TRIPLE =====
     tripleAnalysis(history) {
         if (history.length < 5) return this.pairAnalysis(history);
         const triples = {};
@@ -2099,16 +1351,10 @@ class AdvancedBaccaratPredictor {
                 pred = char;
             }
         }
-        const confidence = Math.min(maxCount / 3, 0.8);
-        return {
-            prediction: pred,
-            confidence: confidence,
-            triples: triples,
-            lastTriple: lastTriple
-        };
+        return { prediction: pred, confidence: Math.min(maxCount / 3, 0.8) };
     }
 
-    // 13.3 Distribution Analysis
+    // ===== DISTRIBUTION =====
     distributionAnalysis(history) {
         if (history.length < 8) return this.pairAnalysis(history);
         const chars = ['B', 'P', 'T'];
@@ -2131,20 +1377,211 @@ class AdvancedBaccaratPredictor {
                 pred = char;
             }
         }
-        const confidence = Math.min(maxDeviation * 0.5, 0.8);
-        return {
-            prediction: pred,
-            confidence: confidence,
-            deviations: deviations,
-            counts: counts,
-            expected: expected
-        };
+        return { prediction: pred, confidence: Math.min(maxDeviation * 0.5, 0.8) };
     }
 
-    // ============================================================
-    // PHƯƠNG PHÁP TỔNG HỢP - 30+ PHƯƠNG PHÁP
-    // ============================================================
+    // ===== VOLATILITY =====
+    volatilityAnalysis(history) {
+        if (history.length < 3) return { prediction: 'B', confidence: 0 };
+        const values = history.split('').map(c => c === 'B' ? 1 : c === 'P' ? -1 : 0);
+        const changes = [];
+        for (let i = 1; i < values.length; i++) {
+            changes.push(Math.abs(values[i] - values[i - 1]));
+        }
+        const avgChange = changes.reduce((a, b) => a + b, 0) / changes.length;
+        const recentChanges = changes.slice(-5);
+        const recentAvg = recentChanges.reduce((a, b) => a + b, 0) / recentChanges.length;
+        let pred = 'B';
+        let confidence = 0;
+        if (recentAvg > avgChange * 1.2) {
+            pred = this.getMaxKeyCounts(history, ['B', 'P', 'T']);
+            confidence = 0.3;
+        } else if (recentAvg < avgChange * 0.8) {
+            pred = history[history.length - 1];
+            confidence = Math.min(0.6, 0.6);
+        } else {
+            pred = this.getMaxKeyCounts(history, ['B', 'P', 'T']);
+            confidence = 0.4;
+        }
+        return { prediction: pred, confidence: confidence };
+    }
 
+    // ===== HARMONIC =====
+    harmonicAnalysis(history) {
+        if (history.length < 8) return { prediction: 'B', confidence: 0 };
+        let harmonicCount = 0;
+        const last8 = history.slice(-8);
+        for (let i = 0; i < 7; i++) {
+            if (last8[i] === last8[i + 1]) harmonicCount++;
+        }
+        let pred = 'B';
+        let confidence = 0;
+        if (harmonicCount >= 3) {
+            pred = last8[7];
+            confidence = Math.min(0.4 + harmonicCount * 0.05, 0.7);
+        } else {
+            pred = this.getMaxKeyCounts(history, ['B', 'P', 'T']);
+            confidence = 0.25;
+        }
+        return { prediction: pred, confidence: confidence };
+    }
+
+    // ===== FIBONACCI =====
+    fibonacciAnalysis(history) {
+        if (history.length < 5) return { prediction: 'B', confidence: 0 };
+        const fib = [1, 1, 2, 3, 5, 8, 13];
+        const positions = [];
+        for (const f of fib) {
+            if (f <= history.length) {
+                positions.push(history.length - f);
+            }
+        }
+        const counts = { 'B': 0, 'P': 0, 'T': 0 };
+        for (const pos of positions) {
+            if (pos >= 0 && pos < history.length) {
+                const char = history[pos];
+                if (counts[char] !== undefined) counts[char]++;
+            }
+        }
+        let pred = 'B';
+        let maxCount = 0;
+        for (const [char, count] of Object.entries(counts)) {
+            if (count > maxCount) {
+                maxCount = count;
+                pred = char;
+            }
+        }
+        return { prediction: pred, confidence: Math.min(maxCount / 3, 0.6) };
+    }
+
+    // ===== RESISTANCE =====
+    resistanceAnalysis(history) {
+        if (history.length < 10) return { prediction: 'B', confidence: 0 };
+        const windows = [];
+        for (let i = 0; i < history.length - 5; i++) {
+            windows.push(history.substring(i, i + 5));
+        }
+        const patterns = {};
+        for (const w of windows) {
+            if (!patterns[w]) patterns[w] = 0;
+            patterns[w]++;
+        }
+        const last5 = history.slice(-5);
+        let supportPattern = null;
+        let maxCount = 0;
+        for (const [pattern, count] of Object.entries(patterns)) {
+            if (pattern.includes(last5[0]) && count > maxCount) {
+                maxCount = count;
+                supportPattern = pattern;
+            }
+        }
+        let pred = 'B';
+        let confidence = 0;
+        if (supportPattern) {
+            const nextChar = supportPattern[supportPattern.length - 1];
+            if (nextChar) {
+                pred = nextChar;
+                confidence = Math.min(maxCount / 5, 0.7);
+            }
+        } else {
+            pred = this.getMaxKeyCounts(history, ['B', 'P', 'T']);
+            confidence = 0.25;
+        }
+        return { prediction: pred, confidence: confidence };
+    }
+
+    // ===== SUPPORT RESISTANCE =====
+    supportResistance(history) {
+        if (history.length < 10) return { prediction: 'B', confidence: 0 };
+        const values = history.split('').map(c => c === 'B' ? 1 : c === 'P' ? -1 : 0);
+        const supports = [];
+        const resistances = [];
+        for (let i = 2; i < values.length - 2; i++) {
+            if (values[i] < values[i-1] && values[i] < values[i-2] &&
+                values[i] < values[i+1] && values[i] < values[i+2]) {
+                supports.push({ index: i, value: values[i] });
+            }
+            if (values[i] > values[i-1] && values[i] > values[i-2] &&
+                values[i] > values[i+1] && values[i] > values[i+2]) {
+                resistances.push({ index: i, value: values[i] });
+            }
+        }
+        const lastValue = values[values.length - 1];
+        let pred = 'B';
+        let confidence = 0;
+        if (supports.length > 0 && resistances.length > 0) {
+            const lastSupport = supports[supports.length - 1];
+            const lastResistance = resistances[resistances.length - 1];
+            if (lastValue <= lastSupport.value + 0.2) {
+                pred = 'B';
+                confidence = 0.6;
+            } else if (lastValue >= lastResistance.value - 0.2) {
+                pred = 'P';
+                confidence = 0.6;
+            } else {
+                pred = this.getMaxKeyCounts(history, ['B', 'P', 'T']);
+                confidence = 0.3;
+            }
+        } else {
+            pred = this.getMaxKeyCounts(history, ['B', 'P', 'T']);
+            confidence = 0.25;
+        }
+        return { prediction: pred, confidence: confidence };
+    }
+
+    // ===== PIVOT =====
+    pivotAnalysis(history) {
+        if (history.length < 10) return this.supportResistance(history);
+        const values = history.split('').map(c => c === 'B' ? 1 : c === 'P' ? -1 : 0);
+        const n = values.length;
+        const high = Math.max(...values);
+        const low = Math.min(...values);
+        const close = values[n - 1];
+        const pivot = (high + low + close) / 3;
+        const r1 = 2 * pivot - low;
+        const s1 = 2 * pivot - high;
+        let pred = 'B';
+        let confidence = 0;
+        if (close > pivot) {
+            pred = 'B';
+            confidence = Math.min((close - pivot) / (r1 - pivot || 1), 0.7);
+        } else if (close < pivot) {
+            pred = 'P';
+            confidence = Math.min((pivot - close) / (pivot - s1 || 1), 0.7);
+        } else {
+            pred = this.getMaxKeyCounts(history, ['B', 'P', 'T']);
+            confidence = 0.3;
+        }
+        return { prediction: pred, confidence: confidence };
+    }
+
+    // ===== TRENDLINE =====
+    trendlineAnalysis(history) {
+        if (history.length < 8) return this.recentTrendAnalysis(history);
+        const values = history.split('').map((c, i) => ({ x: i, y: c === 'B' ? 1 : c === 'P' ? -1 : 0 }));
+        const n = values.length;
+        const sumX = values.reduce((a, b) => a + b.x, 0);
+        const sumY = values.reduce((a, b) => a + b.y, 0);
+        const sumXY = values.reduce((a, b) => a + b.x * b.y, 0);
+        const sumX2 = values.reduce((a, b) => a + b.x * b.x, 0);
+        const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
+        const intercept = (sumY - slope * sumX) / n;
+        const nextX = n;
+        const predictionValue = slope * nextX + intercept;
+        let pred = 'B';
+        let confidence = 0;
+        const rSquared = this.calculateRSquared(values, slope, intercept);
+        if (Math.abs(predictionValue) > 0.3 && rSquared > 0.3) {
+            pred = predictionValue > 0 ? 'B' : 'P';
+            confidence = Math.min(Math.abs(predictionValue) * rSquared, 0.8);
+        } else {
+            pred = this.getMaxKeyCounts(history, ['B', 'P', 'T']);
+            confidence = 0.3;
+        }
+        return { prediction: pred, confidence: confidence };
+    }
+
+    // ===== COMPREHENSIVE ANALYSIS =====
     comprehensiveAnalysis(history) {
         if (history.length < this.config.minDataPoints) {
             return {
@@ -2157,21 +1594,11 @@ class AdvancedBaccaratPredictor {
             };
         }
 
-        // ===== THỰC HIỆN TẤT CẢ PHƯƠNG PHÁP =====
         const methods = {
-            // Nhóm 1: Tần suất (4)
             frequency: this.frequencyAnalysis(history),
             frequency_weighted: this.frequencyWeightedAnalysis(history),
-            sliding_window: this.slidingWindowFrequency(history),
-            normal_distribution: this.normalDistributionAnalysis(history),
-            
-            // Nhóm 2: Xu hướng (4)
             recent: this.recentTrendAnalysis(history),
-            time_weighted: this.timeWeightedTrend(history),
-            exponential: this.exponentialTrend(history),
-            trendline: this.trendlineAnalysis(history),
-            
-            // Nhóm 3: Pattern (9)
+            recent_weighted: this.timeWeightedTrend(history),
             streak: this.streakAnalysis(history),
             zigzag: this.zigzagAnalysis(history),
             repeat: this.repeatPatternAnalysis(history),
@@ -2180,63 +1607,44 @@ class AdvancedBaccaratPredictor {
             pattern_4_4: this.fourFourPattern(history),
             pattern_123: this.pattern123(history),
             pattern_212: this.pattern212(history),
-            composite_pattern: this.compositePatternAnalysis(history),
-            
-            // Nhóm 4: Markov (4)
             markov1: this.markov1Analysis(history),
             markov2: this.markov2Analysis(history),
             markov3: this.markov3Analysis(history),
             markov_adaptive: this.markovAdaptive(history),
-            
-            // Nhóm 5: Bayesian (3)
             bayesian: this.bayesianAnalysis(history),
             bayesian_adaptive: this.bayesianAdaptive(history),
             posterior: this.posteriorProbability(history),
-            
-            // Nhóm 6: Neural (3)
             neural: this.neuralAnalysis(history),
             deep_neural: this.deepNeuralAnalysis(history),
             lstm: this.lstmAnalysis(history),
-            
-            // Nhóm 7: Chuỗi (4)
             gap: this.gapAnalysis(history),
             correlation: this.correlationAnalysis(history),
             autocorrelation: this.autocorrelationAnalysis(history),
             cross_correlation: this.crossCorrelationAnalysis(history),
-            
-            // Nhóm 8: Entropy (3)
             entropy: this.entropyAnalysis(history),
             adaptive_entropy: this.adaptiveEntropy(history),
             information_gain: this.informationGain(history),
-            
-            // Nhóm 9: Động lượng (3)
             momentum: this.momentumAnalysis(history),
             adaptive_momentum: this.adaptiveMomentum(history),
             acceleration: this.accelerationAnalysis(history),
-            
-            // Nhóm 10: Hồi quy (3)
             regression: this.regressionAnalysis(history),
             adaptive_regression: this.adaptiveRegression(history),
             polynomial: this.polynomialRegression(history),
-            
-            // Nhóm 11: Phân cụm (3)
             cluster: this.clusterAnalysis(history),
             hierarchical: this.hierarchicalCluster(history),
             density: this.densityCluster(history),
-            
-            // Nhóm 12: Kỹ thuật (4)
-            support_resistance: this.supportResistance(history),
-            pivot: this.pivotAnalysis(history),
-            fibonacci: this.fibonacciAnalysis(history),
-            harmonic: this.harmonicPattern(history),
-            
-            // Nhóm 13: Khác (3)
             pair: this.pairAnalysis(history),
             triple: this.tripleAnalysis(history),
-            distribution: this.distributionAnalysis(history)
+            distribution: this.distributionAnalysis(history),
+            volatility: this.volatilityAnalysis(history),
+            harmonic: this.harmonicAnalysis(history),
+            fibonacci: this.fibonacciAnalysis(history),
+            resistance: this.resistanceAnalysis(history),
+            support_resistance: this.supportResistance(history),
+            pivot: this.pivotAnalysis(history),
+            trendline: this.trendlineAnalysis(history)
         };
 
-        // ===== TÍNH ĐIỂM =====
         const scores = { 'B': 0, 'P': 0, 'T': 0 };
         const confidences = { 'B': 0, 'P': 0, 'T': 0 };
         const methodResults = {};
@@ -2245,23 +1653,17 @@ class AdvancedBaccaratPredictor {
 
         for (const [name, result] of Object.entries(methods)) {
             if (result && result.prediction && result.confidence && result.confidence > 0.1) {
-                const weight = this.weights[name] || 0.03;
+                const weight = this.weights[name] || 0.02;
                 const pred = result.prediction;
                 const conf = Math.min(result.confidence, 0.9);
-                
                 scores[pred] += weight * 100 * conf;
                 confidences[pred] += weight * conf;
-                methodResults[name] = { 
-                    pred: pred, 
-                    conf: Math.round(conf * 100) / 100,
-                    weight: Math.round(weight * 100) / 100
-                };
+                methodResults[name] = { pred: pred, conf: Math.round(conf * 100) / 100 };
                 totalWeight += weight;
                 validMethods++;
             }
         }
 
-        // ===== CHỌN DỰ ĐOÁN =====
         let maxScore = 0;
         let prediction = 'B';
         let totalConfidence = 0;
@@ -2274,26 +1676,12 @@ class AdvancedBaccaratPredictor {
             }
         }
 
-        // ===== TÍNH WIN RATE =====
         let winRate = Math.round((totalConfidence / (totalWeight || 1)) * 100);
-        winRate = Math.max(25, Math.min(75, winRate));
+        winRate = Math.max(48, Math.min(75, winRate));
         
-        // Điều chỉnh win rate dựa trên số lượng methods
-        if (validMethods > 20) winRate = Math.min(winRate + 5, 80);
-        else if (validMethods > 10) winRate = Math.min(winRate + 3, 75);
-        else if (validMethods < 5) winRate = Math.max(winRate - 5, 25);
-
-        // ===== LƯU LỊCH SỬ =====
-        this.detailedHistory.push({
-            session: this.session + 1,
-            prediction: prediction,
-            winRate: winRate,
-            confidence: totalConfidence / (totalWeight || 1),
-            methods: methodResults,
-            scores: scores,
-            validMethods: validMethods,
-            totalMethods: Object.keys(methods).length
-        });
+        if (winRate === 50) {
+            winRate = Math.random() > 0.5 ? 49 : 51;
+        }
 
         return {
             prediction: prediction,
@@ -2307,14 +1695,10 @@ class AdvancedBaccaratPredictor {
         };
     }
 
-    // ============================================================
-    // CẬP NHẬT PHIÊN MỚI
-    // ============================================================
-
+    // ===== NEW SESSION =====
     newSession(history) {
         this.session++;
         this.history = history;
-        
         this.updateStats(history);
         const result = this.comprehensiveAnalysis(history);
         
@@ -2341,12 +1725,8 @@ class AdvancedBaccaratPredictor {
         return predictionData;
     }
 
-    // ============================================================
-    // THỐNG KÊ
-    // ============================================================
-
+    // ===== UPDATE STATS =====
     updateStats(history) {
-        // Cập nhật counts
         this.stats.counts = { 'B': 0, 'P': 0, 'T': 0 };
         for (const char of history) {
             if (this.stats.counts[char] !== undefined) {
@@ -2354,17 +1734,6 @@ class AdvancedBaccaratPredictor {
             }
         }
         
-        // Cập nhật weighted counts
-        this.stats.weighted_counts = { 'B': 0, 'P': 0, 'T': 0 };
-        for (let i = 0; i < history.length; i++) {
-            const char = history[i];
-            const weight = (i + 1) / history.length;
-            if (this.stats.weighted_counts[char] !== undefined) {
-                this.stats.weighted_counts[char] += weight;
-            }
-        }
-        
-        // Cập nhật streaks
         let currentStreak = 1;
         for (let i = 1; i < history.length; i++) {
             if (history[i] === history[i-1]) {
@@ -2388,7 +1757,6 @@ class AdvancedBaccaratPredictor {
             this.stats.minStreaks[last] = currentStreak;
         }
         
-        // Cập nhật gaps
         const lastPos = { 'B': -1, 'P': -1, 'T': -1 };
         for (let i = 0; i < history.length; i++) {
             const char = history[i];
@@ -2400,51 +1768,20 @@ class AdvancedBaccaratPredictor {
         this.stats.lastPositions = lastPos;
     }
 
+    // ===== GET STATS =====
     getDetailedStats() {
         const total = this.predictions.length;
         if (total === 0) {
             return {
                 total: 0,
                 avgWinRate: 0,
-                accuracy: 0,
                 currentSession: 0,
                 lastPredictions: [],
-                methodPerformance: {},
                 stats: this.stats
             };
         }
         
         const avgWinRate = this.winRateHistory.reduce((sum, item) => sum + item.winRate, 0) / total;
-        
-        // Phân tích hiệu suất theo phương pháp
-        const performance = {};
-        for (const pred of this.predictions) {
-            if (pred.methods) {
-                for (const [method, data] of Object.entries(pred.methods)) {
-                    if (!performance[method]) {
-                        performance[method] = { 
-                            used: 0, 
-                            avgConfidence: 0, 
-                            predictions: {},
-                            totalConfidence: 0
-                        };
-                    }
-                    performance[method].used++;
-                    performance[method].totalConfidence += data.conf || 0;
-                    if (!performance[method].predictions[data.pred]) {
-                        performance[method].predictions[data.pred] = 0;
-                    }
-                    performance[method].predictions[data.pred]++;
-                }
-            }
-        }
-        
-        for (const method of Object.keys(performance)) {
-            if (performance[method].used > 0) {
-                performance[method].avgConfidence = performance[method].totalConfidence / performance[method].used;
-                delete performance[method].totalConfidence;
-            }
-        }
         
         const lastPredictions = this.predictions.slice(-10).map(p => ({
             session: p.session,
@@ -2457,16 +1794,12 @@ class AdvancedBaccaratPredictor {
             avgWinRate: Math.round(avgWinRate),
             currentSession: this.session,
             lastPredictions: lastPredictions,
-            methodPerformance: performance,
             stats: this.stats,
             predictions: this.predictions
         };
     }
 
-    // ============================================================
-    // HELPER FUNCTIONS
-    // ============================================================
-
+    // ===== HELPERS =====
     getMaxKey(obj) {
         let max = -Infinity;
         let key = 'B';
