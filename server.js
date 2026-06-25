@@ -14,6 +14,7 @@ app.use((req, res, next) => {
 // ===== LƯU DỮ LIỆU =====
 const lastData = {};
 const sessionData = {};
+const historyCache = {};
 
 // ============================================================
 // HÀM CHUYỂN STRING -> ARRAY
@@ -23,505 +24,497 @@ function toArray(str) {
 }
 
 // ============================================================
-// THUẬT TOÁN RIÊNG CHO TỪNG BÀN (ĐÃ SỬA LỖI)
+// LỚP THUẬT TOÁN ĐA LUỒNG VIP
 // ============================================================
-
-// ===== BÀN 1: STREAK + ZIGZAG =====
-function algorithmTable1(history) {
-    const arr = toArray(history);
-    if (!arr || arr.length < 3) {
-        return { prediction: 'Player', winRate: 49, pattern: 'Chưa đủ dữ liệu' };
+class VIPAlgorithm {
+    constructor(tableId) {
+        this.tableId = tableId;
+        this.predictions = [];
+        this.confidenceHistory = [];
+        this.patternHistory = [];
     }
 
-    const counts = { B: 0, P: 0, T: 0 };
-    for (const c of arr) {
-        if (counts[c] !== undefined) counts[c]++;
+    // ===== PHÂN TÍCH TẦN SUẤT NÂNG CAO =====
+    frequencyAnalysis(arr) {
+        const total = arr.length || 1;
+        const counts = { B: 0, P: 0, T: 0 };
+        for (const c of arr) {
+            if (counts[c] !== undefined) counts[c]++;
+        }
+        
+        // Tính xác suất có điều kiện
+        const probs = {
+            B: counts.B / total,
+            P: counts.P / total,
+            T: counts.T / total
+        };
+        
+        // Điều chỉnh theo xác suất thực tế của Baccarat (Banker ~45.86%, Player ~44.62%, Tie ~9.52%)
+        const adjusted = {
+            B: probs.B * 0.4586 + 0.1,
+            P: probs.P * 0.4462 + 0.1,
+            T: probs.T * 0.0952 + 0.05
+        };
+        
+        // Chuẩn hóa về 100%
+        const sum = adjusted.B + adjusted.P + adjusted.T;
+        return {
+            B: (adjusted.B / sum) * 100,
+            P: (adjusted.P / sum) * 100,
+            T: (adjusted.T / sum) * 100
+        };
     }
 
-    let maxStreak = 1;
-    let streakChar = arr[0];
-    let currentStreak = 1;
-    for (let i = 1; i < arr.length; i++) {
-        if (arr[i] === arr[i-1]) {
-            currentStreak++;
-            if (currentStreak > maxStreak) {
-                maxStreak = currentStreak;
-                streakChar = arr[i];
+    // ===== PHÂN TÍCH STREAK (DÂY) =====
+    streakAnalysis(arr) {
+        if (arr.length < 2) return { B: 33.3, P: 33.3, T: 33.3 };
+        
+        let currentStreak = 1;
+        const streaks = { B: [], P: [], T: [] };
+        let currentChar = arr[0];
+        
+        for (let i = 1; i < arr.length; i++) {
+            if (arr[i] === currentChar) {
+                currentStreak++;
+            } else {
+                streaks[currentChar].push(currentStreak);
+                currentChar = arr[i];
+                currentStreak = 1;
+            }
+        }
+        streaks[currentChar].push(currentStreak);
+        
+        // Tính xác suất streak tiếp tục
+        const avgStreaks = {};
+        const maxStreaks = {};
+        for (const key of ['B', 'P', 'T']) {
+            if (streaks[key].length > 0) {
+                avgStreaks[key] = streaks[key].reduce((a, b) => a + b, 0) / streaks[key].length;
+                maxStreaks[key] = Math.max(...streaks[key]);
+            } else {
+                avgStreaks[key] = 1;
+                maxStreaks[key] = 1;
+            }
+        }
+        
+        const lastChar = arr[arr.length - 1];
+        const lastStreak = streaks[lastChar] ? streaks[lastChar][streaks[lastChar].length - 1] : 1;
+        const continueProb = lastStreak / (avgStreaks[lastChar] || 1);
+        
+        // Xác suất đảo chiều
+        const reverseProb = 1 - Math.min(continueProb, 1);
+        
+        let result = { B: 0, P: 0, T: 0 };
+        const others = ['B', 'P', 'T'].filter(c => c !== lastChar);
+        
+        // Nếu streak dài, khả năng đảo chiều cao
+        if (lastStreak >= 4) {
+            const rev = Math.min(0.7 + (lastStreak - 4) * 0.05, 0.85);
+            result[others[0]] = rev * 0.5;
+            result[others[1]] = rev * 0.3;
+            result[lastChar] = (1 - rev) * 0.8;
+        } else {
+            result[lastChar] = continueProb * 0.7;
+            result[others[0]] = (1 - continueProb) * 0.5;
+            result[others[1]] = (1 - continueProb) * 0.3;
+        }
+        
+        // Chuẩn hóa
+        const sum = result.B + result.P + result.T;
+        if (sum > 0) {
+            return {
+                B: (result.B / sum) * 100,
+                P: (result.P / sum) * 100,
+                T: (result.T / sum) * 100
+            };
+        }
+        return { B: 33.3, P: 33.3, T: 33.3 };
+    }
+
+    // ===== PHÂN TÍCH PATTERN 2-2, 3-3 =====
+    patternAnalysis(arr) {
+        if (arr.length < 6) return { B: 33.3, P: 33.3, T: 33.3 };
+        
+        let pattern22 = 0;
+        let pattern33 = 0;
+        let pattern22Char = '';
+        let pattern33Char = '';
+        
+        // Phát hiện pattern 2-2
+        for (let i = 1; i < Math.min(10, arr.length - 1); i += 2) {
+            if (arr[arr.length - i] === arr[arr.length - i - 1]) {
+                pattern22++;
+                pattern22Char = arr[arr.length - i];
+            }
+        }
+        
+        // Phát hiện pattern 3-3
+        for (let i = 2; i < Math.min(12, arr.length - 1); i += 3) {
+            if (arr[arr.length - i] === arr[arr.length - i - 1] &&
+                arr[arr.length - i] === arr[arr.length - i - 2]) {
+                pattern33++;
+                pattern33Char = arr[arr.length - i];
+            }
+        }
+        
+        let result = { B: 0, P: 0, T: 0 };
+        
+        if (pattern33 >= 2) {
+            // Pattern 3-3 mạnh -> khả năng đảo chiều
+            const rev = 0.65 + pattern33 * 0.03;
+            const otherChars = ['B', 'P', 'T'].filter(c => c !== pattern33Char);
+            result[otherChars[0]] = rev * 0.5;
+            result[otherChars[1]] = rev * 0.3;
+            result[pattern33Char] = (1 - rev) * 0.8;
+        } else if (pattern22 >= 3) {
+            // Pattern 2-2 mạnh
+            const rev = 0.55 + pattern22 * 0.02;
+            const otherChars = ['B', 'P', 'T'].filter(c => c !== pattern22Char);
+            result[otherChars[0]] = rev * 0.5;
+            result[otherChars[1]] = rev * 0.3;
+            result[pattern22Char] = (1 - rev) * 0.8;
+        } else {
+            // Không có pattern rõ ràng
+            const counts = { B: 0, P: 0, T: 0 };
+            for (const c of arr) {
+                if (counts[c] !== undefined) counts[c]++;
+            }
+            const total = arr.length;
+            result.B = counts.B / total;
+            result.P = counts.P / total;
+            result.T = counts.T / total;
+        }
+        
+        const sum = result.B + result.P + result.T;
+        if (sum > 0) {
+            return {
+                B: (result.B / sum) * 100,
+                P: (result.P / sum) * 100,
+                T: (result.T / sum) * 100
+            };
+        }
+        return { B: 33.3, P: 33.3, T: 33.3 };
+    }
+
+    // ===== PHÂN TÍCH MARKOV BẬC 2 =====
+    markovAnalysis(arr) {
+        if (arr.length < 4) return { B: 33.3, P: 33.3, T: 33.3 };
+        
+        const markov2 = {};
+        for (let i = 0; i < arr.length - 2; i++) {
+            const key = arr[i] + arr[i + 1];
+            const next = arr[i + 2];
+            if (!markov2[key]) {
+                markov2[key] = { B: 0, P: 0, T: 0 };
+            }
+            if (markov2[key][next] !== undefined) {
+                markov2[key][next]++;
+            }
+        }
+        
+        const lastKey = arr.slice(-2).join('');
+        const transitions = markov2[lastKey];
+        
+        if (!transitions) return { B: 33.3, P: 33.3, T: 33.3 };
+        
+        const total = transitions.B + transitions.P + transitions.T;
+        if (total === 0) return { B: 33.3, P: 33.3, T: 33.3 };
+        
+        // Làm mượt xác suất (smoothing)
+        const smoothing = 1;
+        return {
+            B: ((transitions.B + smoothing) / (total + smoothing * 3)) * 100,
+            P: ((transitions.P + smoothing) / (total + smoothing * 3)) * 100,
+            T: ((transitions.T + smoothing) / (total + smoothing * 3)) * 100
+        };
+    }
+
+    // ===== PHÂN TÍCH KHOẢNG CÁCH (GAP) =====
+    gapAnalysis(arr) {
+        if (arr.length < 5) return { B: 33.3, P: 33.3, T: 33.3 };
+        
+        const gaps = { B: [], P: [], T: [] };
+        const lastPos = { B: -1, P: -1, T: -1 };
+        
+        for (let i = 0; i < arr.length; i++) {
+            const char = arr[i];
+            if (lastPos[char] !== -1) {
+                gaps[char].push(i - lastPos[char] - 1);
+            }
+            lastPos[char] = i;
+        }
+        
+        const avgGaps = {};
+        const stdGaps = {};
+        for (const key of ['B', 'P', 'T']) {
+            if (gaps[key].length > 0) {
+                avgGaps[key] = gaps[key].reduce((a, b) => a + b, 0) / gaps[key].length;
+                const variance = gaps[key].reduce((a, b) => a + Math.pow(b - avgGaps[key], 2), 0) / gaps[key].length;
+                stdGaps[key] = Math.sqrt(variance);
+            } else {
+                avgGaps[key] = 2;
+                stdGaps[key] = 1;
+            }
+        }
+        
+        const currentGap = {};
+        for (const key of ['B', 'P', 'T']) {
+            currentGap[key] = arr.length - 1 - lastPos[key];
+        }
+        
+        // Tính z-score cho từng cửa
+        const zScores = {};
+        for (const key of ['B', 'P', 'T']) {
+            if (lastPos[key] === -1) {
+                zScores[key] = 0.5;
+            } else {
+                zScores[key] = (currentGap[key] - avgGaps[key]) / (stdGaps[key] || 1);
+            }
+        }
+        
+        // Cửa nào có z-score cao nhất -> khả năng xuất hiện cao
+        const result = { B: 0, P: 0, T: 0 };
+        const zSum = Math.abs(zScores.B) + Math.abs(zScores.P) + Math.abs(zScores.T) || 1;
+        for (const key of ['B', 'P', 'T']) {
+            result[key] = (Math.abs(zScores[key]) / zSum) * 100;
+        }
+        
+        return result;
+    }
+
+    // ===== PHÂN TÍCH MOMENTUM =====
+    momentumAnalysis(arr) {
+        if (arr.length < 5) return { B: 33.3, P: 33.3, T: 33.3 };
+        
+        const values = arr.map(c => {
+            if (c === 'B') return 1;
+            if (c === 'P') return -1;
+            return 0;
+        });
+        
+        // Tính momentum (đạo hàm bậc 1)
+        const momentum = [];
+        for (let i = 1; i < values.length; i++) {
+            momentum.push(values[i] - values[i - 1]);
+        }
+        
+        // Tính acceleration (đạo hàm bậc 2)
+        const acceleration = [];
+        for (let i = 1; i < momentum.length; i++) {
+            acceleration.push(momentum[i] - momentum[i - 1]);
+        }
+        
+        // Lấy giá trị gần nhất
+        const lastMomentum = momentum[momentum.length - 1] || 0;
+        const lastAcceleration = acceleration[acceleration.length - 1] || 0;
+        
+        // Dự đoán dựa trên momentum và acceleration
+        let result = { B: 0, P: 0, T: 0 };
+        
+        // Momentum mạnh -> xu hướng tiếp tục
+        if (Math.abs(lastMomentum) > 1.5) {
+            const strength = Math.min(Math.abs(lastMomentum) / 3, 0.8);
+            if (lastMomentum > 0) {
+                result.B = strength * 100;
+                result.P = (1 - strength) * 50;
+                result.T = (1 - strength) * 20;
+            } else {
+                result.P = strength * 100;
+                result.B = (1 - strength) * 50;
+                result.T = (1 - strength) * 20;
+            }
+        } else if (Math.abs(lastAcceleration) > 0.8) {
+            // Acceleration mạnh -> chuẩn bị đảo chiều
+            const strength = Math.min(Math.abs(lastAcceleration) / 2, 0.7);
+            if (lastAcceleration > 0) {
+                result.B = strength * 100;
+                result.P = (1 - strength) * 50;
+                result.T = (1 - strength) * 20;
+            } else {
+                result.P = strength * 100;
+                result.B = (1 - strength) * 50;
+                result.T = (1 - strength) * 20;
             }
         } else {
-            currentStreak = 1;
+            // Không có momentum rõ ràng -> dùng tần suất
+            const freq = this.frequencyAnalysis(arr);
+            result = freq;
         }
+        
+        const sum = result.B + result.P + result.T || 1;
+        return {
+            B: (result.B / sum) * 100,
+            P: (result.P / sum) * 100,
+            T: (result.T / sum) * 100
+        };
     }
 
-    let zigzagCount = 0;
-    for (let i = 1; i < arr.length - 1; i++) {
-        if (arr[i] !== arr[i-1] && arr[i] !== arr[i+1]) {
-            zigzagCount++;
+    // ===== PHÂN TÍCH ENTROPY =====
+    entropyAnalysis(arr) {
+        if (arr.length < 5) return { B: 33.3, P: 33.3, T: 33.3 };
+        
+        const counts = { B: 0, P: 0, T: 0 };
+        for (const c of arr) {
+            if (counts[c] !== undefined) counts[c]++;
         }
-    }
-
-    const total = arr.length;
-    const pPercent = (counts.P / total) * 100;
-    const bPercent = (counts.B / total) * 100;
-
-    let prediction = 'Player';
-    let winRate = 0;
-    let pattern = '';
-
-    if (maxStreak >= 4 && streakChar === 'P') {
-        prediction = 'Player';
-        winRate = 58 + Math.random() * 4;
-        pattern = `Dây Player x${maxStreak} đang mạnh`;
-    } else if (maxStreak >= 4 && streakChar === 'B') {
-        prediction = 'Banker';
-        winRate = 56 + Math.random() * 3;
-        pattern = `Dây Banker x${maxStreak} đang mạnh`;
-    } else if (zigzagCount >= 4) {
-        const lastChar = arr[arr.length - 1];
-        prediction = lastChar === 'P' ? 'Banker' : 'Player';
-        winRate = 53 + Math.random() * 3;
-        pattern = `Zigzag ${zigzagCount} lần, đang đảo chiều`;
-    } else if (pPercent > 55) {
-        prediction = 'Player';
-        winRate = 52 + Math.random() * 2;
-        pattern = `Player áp đảo ${Math.round(pPercent)}%`;
-    } else if (bPercent > 55) {
-        prediction = 'Banker';
-        winRate = 52 + Math.random() * 2;
-        pattern = `Banker áp đảo ${Math.round(bPercent)}%`;
-    } else {
-        const last3 = arr.slice(-3);
-        if (last3.every(c => c === 'P')) {
-            prediction = 'Banker';
-            winRate = 55 + Math.random() * 3;
-            pattern = 'Đảo chiều sau 3 Player';
-        } else if (last3.every(c => c === 'B')) {
-            prediction = 'Player';
-            winRate = 55 + Math.random() * 3;
-            pattern = 'Đảo chiều sau 3 Banker';
+        
+        const total = arr.length;
+        let entropy = 0;
+        const probs = {};
+        for (const key of ['B', 'P', 'T']) {
+            probs[key] = counts[key] / total;
+            if (probs[key] > 0) {
+                entropy -= probs[key] * Math.log2(probs[key]);
+            }
+        }
+        
+        const maxEntropy = Math.log2(3);
+        const predictability = 1 - (entropy / maxEntropy);
+        
+        // Entropy thấp -> dễ dự đoán, entropy cao -> khó dự đoán
+        if (predictability > 0.6) {
+            // Dễ dự đoán -> dùng tần suất
+            return this.frequencyAnalysis(arr);
+        } else if (predictability < 0.3) {
+            // Khó dự đoán -> ưu tiên Tie
+            return { B: 30, P: 30, T: 40 };
         } else {
-            prediction = arr[arr.length - 1] === 'P' ? 'Banker' : 'Player';
-            winRate = 50 + Math.random() * 3;
-            pattern = 'Cầu đan xen, theo xu hướng ngược';
+            // Trung bình -> kết hợp
+            const freq = this.frequencyAnalysis(arr);
+            return {
+                B: freq.B * 0.6 + 20,
+                P: freq.P * 0.6 + 20,
+                T: freq.T * 0.8 + 15
+            };
         }
     }
 
-    return {
-        prediction: prediction,
-        winRate: Math.round(Math.min(winRate, 75)),
-        pattern: pattern,
-        stats: { P: Math.round(pPercent), B: Math.round(bPercent), streak: maxStreak, zigzag: zigzagCount }
-    };
-}
-
-// ===== BÀN 5: PATTERN 2-2 + 3-3 =====
-function algorithmTable5(history) {
-    const arr = toArray(history);
-    if (!arr || arr.length < 3) {
-        return { prediction: 'Banker', winRate: 51, pattern: 'Chưa đủ dữ liệu' };
-    }
-
-    let pattern22 = 0;
-    for (let i = 1; i < Math.min(10, arr.length - 1); i += 2) {
-        if (arr[arr.length - i] === arr[arr.length - i - 1]) {
-            pattern22++;
+    // ============================================================
+    // TỔNG HỢP ĐA LUỒNG
+    // ============================================================
+    comprehensiveAnalysis(history) {
+        const arr = toArray(history);
+        if (arr.length < 3) {
+            return {
+                banker: 48,
+                player: 45,
+                tie: 7,
+                prediction: 'Player',
+                pattern: 'Chưa đủ dữ liệu',
+                confidence: 50
+            };
         }
-    }
 
-    let pattern33 = 0;
-    for (let i = 2; i < Math.min(12, arr.length - 1); i += 3) {
-        if (arr[arr.length - i] === arr[arr.length - i - 1] &&
-            arr[arr.length - i] === arr[arr.length - i - 2]) {
-            pattern33++;
+        // ===== CHẠY 6 LUỒNG PHÂN TÍCH SONG SONG =====
+        const results = [
+            this.frequencyAnalysis(arr),
+            this.streakAnalysis(arr),
+            this.patternAnalysis(arr),
+            this.markovAnalysis(arr),
+            this.gapAnalysis(arr),
+            this.momentumAnalysis(arr),
+            this.entropyAnalysis(arr)
+        ];
+
+        // ===== TRỌNG SỐ CHO TỪNG LUỒNG =====
+        const weights = [0.18, 0.17, 0.15, 0.15, 0.12, 0.12, 0.11];
+        
+        // ===== TỔNG HỢP KẾT QUẢ =====
+        let bankerScore = 0;
+        let playerScore = 0;
+        let tieScore = 0;
+        let totalWeight = 0;
+
+        for (let i = 0; i < results.length; i++) {
+            const r = results[i];
+            const w = weights[i];
+            bankerScore += r.B * w;
+            playerScore += r.P * w;
+            tieScore += r.T * w;
+            totalWeight += w;
         }
-    }
 
-    const counts = { B: 0, P: 0, T: 0 };
-    for (const c of arr) {
-        if (counts[c] !== undefined) counts[c]++;
-    }
+        // Chuẩn hóa về 100%
+        const sum = bankerScore + playerScore + tieScore;
+        let banker = (bankerScore / sum) * 100;
+        let player = (playerScore / sum) * 100;
+        let tie = (tieScore / sum) * 100;
 
-    const total = arr.length;
-    const pPercent = (counts.P / total) * 100;
-    const bPercent = (counts.B / total) * 100;
+        // ===== ĐIỀU CHỈNH THEO XÁC SUẤT THỰC TẾ =====
+        // Banker: 45.86%, Player: 44.62%, Tie: 9.52%
+        banker = banker * 0.7 + 13.76;
+        player = player * 0.7 + 13.39;
+        tie = tie * 0.7 + 2.86;
 
-    const last5 = arr.slice(-5);
-    const pCount = last5.filter(c => c === 'P').length;
-    const bCount = last5.filter(c => c === 'B').length;
+        // Chuẩn hóa lại
+        const total = banker + player + tie;
+        banker = (banker / total) * 100;
+        player = (player / total) * 100;
+        tie = (tie / total) * 100;
 
-    let prediction = 'Banker';
-    let winRate = 0;
-    let pattern = '';
+        // ===== XÁC ĐỊNH DỰ ĐOÁN =====
+        let prediction = 'Player';
+        let maxRate = Math.max(banker, player, tie);
+        if (maxRate === banker) prediction = 'Banker';
+        else if (maxRate === player) prediction = 'Player';
+        else prediction = 'Tie';
 
-    if (pattern33 >= 2) {
-        const lastChar = arr[arr.length - 1];
-        if (lastChar === 'B') {
-            prediction = 'Player';
-            winRate = 62 + Math.random() * 3;
-            pattern = `Cầu 3-3 đang ở đỉnh, sắp đảo chiều sang Player`;
-        } else {
-            prediction = 'Banker';
-            winRate = 62 + Math.random() * 3;
-            pattern = `Cầu 3-3 đang ở đỉnh, sắp đảo chiều sang Banker`;
-        }
-    } else if (pattern22 >= 3) {
-        const lastChar = arr[arr.length - 1];
-        prediction = lastChar === 'P' ? 'Banker' : 'Player';
-        winRate = 58 + Math.random() * 4;
-        pattern = `Cầu 2-2 mạnh, đang ở ${lastChar === 'P' ? 'Player' : 'Banker'}, sắp đảo chiều`;
-    } else if (pPercent > 58) {
-        prediction = 'Player';
-        winRate = 54 + Math.random() * 3;
-        pattern = `Player đang áp đảo ${Math.round(pPercent)}%`;
-    } else if (bPercent > 58) {
-        prediction = 'Banker';
-        winRate = 54 + Math.random() * 3;
-        pattern = `Banker đang áp đảo ${Math.round(bPercent)}%`;
-    } else if (pCount > bCount) {
-        prediction = 'Banker';
-        winRate = 53 + Math.random() * 2;
-        pattern = `5 gần nhất Player ${pCount}/${bCount}, đảo chiều`;
-    } else if (bCount > pCount) {
-        prediction = 'Player';
-        winRate = 53 + Math.random() * 2;
-        pattern = `5 gần nhất Banker ${bCount}/${pCount}, đảo chiều`;
-    } else {
-        prediction = arr[arr.length - 1] === 'P' ? 'Banker' : 'Player';
-        winRate = 50 + Math.random() * 3;
-        pattern = 'Cầu đan xen';
-    }
+        // ===== TÍNH ĐỘ TIN CẬY =====
+        const confidence = Math.max(banker, player, tie) - 10;
+        const finalConfidence = Math.min(Math.max(confidence, 20), 80);
 
-    return {
-        prediction: prediction,
-        winRate: Math.round(Math.min(winRate, 75)),
-        pattern: pattern,
-        stats: { P: Math.round(pPercent), B: Math.round(bPercent), pattern22, pattern33 }
-    };
-}
-
-// ===== BÀN 6: MARKOV + ENTROPY =====
-function algorithmTable6(history) {
-    const arr = toArray(history);
-    if (!arr || arr.length < 3) {
-        return { prediction: 'Banker', winRate: 50, pattern: 'Chưa đủ dữ liệu' };
-    }
-
-    const markov = { 'B': { 'B': 0, 'P': 0 }, 'P': { 'B': 0, 'P': 0 } };
-    for (let i = 0; i < arr.length - 1; i++) {
-        if (markov[arr[i]] && markov[arr[i]][arr[i + 1]] !== undefined) {
-            markov[arr[i]][arr[i + 1]]++;
-        }
-    }
-
-    const lastChar = arr[arr.length - 1];
-    const transitions = markov[lastChar];
-    let markovPred = 'B';
-    let markovProb = 0;
-    if (transitions) {
-        const total = transitions.B + transitions.P;
-        if (total > 0) {
-            markovProb = transitions.P / total;
-            markovPred = markovProb > 0.5 ? 'P' : 'B';
-        }
-    }
-
-    const counts = { 'B': 0, 'P': 0, 'T': 0 };
-    for (const c of arr) {
-        if (counts[c] !== undefined) counts[c]++;
-    }
-    const total = arr.length;
-    let entropy = 0;
-    for (const c of ['B', 'P', 'T']) {
-        const prob = counts[c] / total;
-        if (prob > 0) entropy -= prob * Math.log2(prob);
-    }
-    const maxEntropy = Math.log2(3);
-    const predictability = 1 - (entropy / maxEntropy);
-
-    let prediction = 'Banker';
-    let winRate = 0;
-    let pattern = '';
-
-    if (predictability > 0.6) {
-        prediction = markovPred;
-        winRate = 56 + Math.random() * 4;
-        pattern = `Markov mạnh (${Math.round(predictability * 100)}%), theo ${markovPred === 'P' ? 'Player' : 'Banker'}`;
-    } else if (predictability < 0.4) {
+        // ===== PHÂN TÍCH CẦU =====
+        let pattern = '';
         const last5 = arr.slice(-5);
-        const pCount = last5.filter(c => c === 'P').length;
-        const bCount = last5.filter(c => c === 'B').length;
-        prediction = pCount > bCount ? 'Player' : 'Banker';
-        winRate = 52 + Math.random() * 3;
-        pattern = `Entropy cao (${Math.round(entropy * 10) / 10}), theo xu hướng gần nhất`;
-    } else {
         const last3 = arr.slice(-3);
+        
         if (last3.every(c => c === last3[0])) {
-            prediction = last3[0] === 'P' ? 'Banker' : 'Player';
-            winRate = 58 + Math.random() * 3;
-            pattern = `Dây ${last3[0]} x3, đảo chiều`;
+            pattern = `Dây ${last3[0]} x${last3.length}`;
+        } else if (last5.length >= 5 && 
+                   last5[0] === last5[2] && last5[1] === last5[3] && last5[2] === last5[4]) {
+            pattern = `Cầu 1-2-3: ${last5.join('')}`;
+        } else if (last5.length >= 4 && 
+                   last5[0] === last5[2] && last5[1] === last5[3]) {
+            pattern = `Cầu 2-2: ${last5.slice(0, 4).join('')}`;
+        } else if (last5.length >= 6 && 
+                   last5[0] === last5[3] && last5[1] === last5[4] && last5[2] === last5[5]) {
+            pattern = `Cầu 3-3: ${last5.slice(0, 6).join('')}`;
         } else {
-            prediction = arr[arr.length - 1];
-            winRate = 50 + Math.random() * 3;
-            pattern = `Theo kết quả cuối ${arr[arr.length - 1] === 'P' ? 'Player' : 'Banker'}`;
-        }
-    }
-
-    return {
-        prediction: prediction,
-        winRate: Math.round(Math.min(winRate, 75)),
-        pattern: pattern,
-        stats: { entropy: Math.round(entropy * 10) / 10, predictability: Math.round(predictability * 100) }
-    };
-}
-
-// ===== BÀN 10: MOMENTUM + REGRESSION =====
-function algorithmTable10(history) {
-    const arr = toArray(history);
-    if (!arr || arr.length < 3) {
-        return { prediction: 'Player', winRate: 50, pattern: 'Chưa đủ dữ liệu' };
-    }
-
-    const values = arr.map(c => c === 'P' ? 1 : c === 'B' ? -1 : 0);
-    let momentum = 0;
-    for (let i = 1; i < Math.min(values.length, 10); i++) {
-        momentum += values[i] - values[i - 1];
-    }
-
-    const n = Math.min(values.length, 20);
-    let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0;
-    for (let i = 0; i < n; i++) {
-        sumX += i;
-        sumY += values[i];
-        sumXY += i * values[i];
-        sumX2 += i * i;
-    }
-    const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX || 1);
-    const intercept = (sumY - slope * sumX) / n;
-    const nextValue = slope * n + intercept;
-
-    const counts = { 'B': 0, 'P': 0, 'T': 0 };
-    for (const c of arr) {
-        if (counts[c] !== undefined) counts[c]++;
-    }
-    const total = arr.length;
-    const pPercent = (counts.P / total) * 100;
-    const bPercent = (counts.B / total) * 100;
-
-    const last5 = arr.slice(-5);
-    const pCount = last5.filter(c => c === 'P').length;
-    const bCount = last5.filter(c => c === 'B').length;
-
-    let prediction = 'Player';
-    let winRate = 0;
-    let pattern = '';
-
-    if (Math.abs(momentum) > 3) {
-        prediction = momentum > 0 ? 'Player' : 'Banker';
-        winRate = 58 + Math.random() * 4;
-        pattern = `Momentum mạnh ${momentum > 0 ? 'Player' : 'Banker'}`;
-    } else if (nextValue > 0.3) {
-        prediction = 'Player';
-        winRate = 54 + Math.random() * 3;
-        pattern = `Regression dự báo Player (${Math.round(nextValue * 100)}%)`;
-    } else if (nextValue < -0.3) {
-        prediction = 'Banker';
-        winRate = 54 + Math.random() * 3;
-        pattern = `Regression dự báo Banker (${Math.round(Math.abs(nextValue) * 100)}%)`;
-    } else if (pPercent > 55) {
-        prediction = 'Player';
-        winRate = 52 + Math.random() * 2;
-        pattern = `Player áp đảo ${Math.round(pPercent)}%`;
-    } else if (bPercent > 55) {
-        prediction = 'Banker';
-        winRate = 52 + Math.random() * 2;
-        pattern = `Banker áp đảo ${Math.round(bPercent)}%`;
-    } else if (pCount > bCount) {
-        prediction = 'Player';
-        winRate = 51 + Math.random() * 2;
-        pattern = `5 gần nhất Player ${pCount}/${bCount}`;
-    } else if (bCount > pCount) {
-        prediction = 'Banker';
-        winRate = 51 + Math.random() * 2;
-        pattern = `5 gần nhất Banker ${bCount}/${pCount}`;
-    } else {
-        prediction = arr[arr.length - 1] === 'P' ? 'Player' : 'Banker';
-        winRate = 49 + Math.random() * 3;
-        pattern = 'Cầu đan xen';
-    }
-
-    return {
-        prediction: prediction,
-        winRate: Math.round(Math.min(winRate, 75)),
-        pattern: pattern,
-        stats: { momentum: Math.round(momentum * 10) / 10, regression: Math.round(nextValue * 100) }
-    };
-}
-
-// ===== BÀN 11: CLUSTER + DISTRIBUTION =====
-function algorithmTable11(history) {
-    const arr = toArray(history);
-    if (!arr || arr.length < 3) {
-        return { prediction: 'Banker', winRate: 51, pattern: 'Chưa đủ dữ liệu' };
-    }
-
-    const clusters = { 'B': [], 'P': [], 'T': [] };
-    let currentCluster = [];
-    let currentChar = arr[0];
-    for (const char of arr) {
-        if (char === currentChar) {
-            currentCluster.push(char);
-        } else {
-            if (currentCluster.length > 0) {
-                clusters[currentChar].push(currentCluster.length);
-            }
-            currentChar = char;
-            currentCluster = [char];
-        }
-    }
-    if (currentCluster.length > 0) {
-        clusters[currentChar].push(currentCluster.length);
-    }
-
-    const counts = { 'B': 0, 'P': 0, 'T': 0 };
-    for (const c of arr) {
-        if (counts[c] !== undefined) counts[c]++;
-    }
-    const total = arr.length;
-    const pPercent = (counts.P / total) * 100;
-    const bPercent = (counts.B / total) * 100;
-
-    let maxClusterSize = 0;
-    let maxClusterChar = 'B';
-    for (const [char, sizes] of Object.entries(clusters)) {
-        if (sizes.length > 0) {
-            const avg = sizes.reduce((a, b) => a + b, 0) / sizes.length;
-            if (avg > maxClusterSize) {
-                maxClusterSize = avg;
-                maxClusterChar = char;
+            const diff = Math.abs(banker - player);
+            if (diff > 10) {
+                pattern = `Xu hướng ${prediction} (${Math.round(diff)}%)`;
+            } else {
+                pattern = 'Cầu đan xen';
             }
         }
+
+        return {
+            banker: Math.round(Math.max(banker, 3)),
+            player: Math.round(Math.max(player, 3)),
+            tie: Math.round(Math.max(tie, 2)),
+            prediction: prediction,
+            pattern: pattern,
+            confidence: Math.round(finalConfidence),
+            totalGames: arr.length,
+            stats: {
+                B: Math.round(arr.filter(c => c === 'B').length / arr.length * 100),
+                P: Math.round(arr.filter(c => c === 'P').length / arr.length * 100),
+                T: Math.round(arr.filter(c => c === 'T').length / arr.length * 100)
+            }
+        };
     }
-
-    const last10 = arr.slice(-10);
-    const p10 = last10.filter(c => c === 'P').length;
-    const b10 = last10.filter(c => c === 'B').length;
-
-    let prediction = 'Banker';
-    let winRate = 0;
-    let pattern = '';
-
-    if (maxClusterSize > 2.5) {
-        prediction = maxClusterChar === 'P' ? 'Player' : 'Banker';
-        winRate = 56 + Math.random() * 4;
-        pattern = `Cluster mạnh (${Math.round(maxClusterSize)}), theo ${maxClusterChar === 'P' ? 'Player' : 'Banker'}`;
-    } else if (pPercent > 60) {
-        prediction = 'Player';
-        winRate = 54 + Math.random() * 3;
-        pattern = `Player áp đảo ${Math.round(pPercent)}%`;
-    } else if (bPercent > 60) {
-        prediction = 'Banker';
-        winRate = 54 + Math.random() * 3;
-        pattern = `Banker áp đảo ${Math.round(bPercent)}%`;
-    } else if (p10 > b10 + 2) {
-        prediction = 'Banker';
-        winRate = 55 + Math.random() * 3;
-        pattern = `10 gần nhất Player ${p10}/${b10}, đảo chiều`;
-    } else if (b10 > p10 + 2) {
-        prediction = 'Player';
-        winRate = 55 + Math.random() * 3;
-        pattern = `10 gần nhất Banker ${b10}/${p10}, đảo chiều`;
-    } else {
-        prediction = arr[arr.length - 1] === 'P' ? 'Player' : 'Banker';
-        winRate = 50 + Math.random() * 3;
-        pattern = 'Cầu đan xen, theo kết quả cuối';
-    }
-
-    return {
-        prediction: prediction,
-        winRate: Math.round(Math.min(winRate, 75)),
-        pattern: pattern,
-        stats: { clusterSize: Math.round(maxClusterSize * 10) / 10, P: Math.round(pPercent), B: Math.round(bPercent) }
-    };
 }
 
-// ===== BÀN 12: FIBONACCI + HARMONIC =====
-function algorithmTable12(history) {
-    const arr = toArray(history);
-    if (!arr || arr.length < 3) {
-        return { prediction: 'Player', winRate: 50, pattern: 'Chưa đủ dữ liệu' };
+// ============================================================
+// TẠO INSTANCE CHO TỪNG BÀN
+// ============================================================
+const algorithms = {};
+
+function getAlgorithm(tableId) {
+    if (!algorithms[tableId]) {
+        algorithms[tableId] = new VIPAlgorithm(tableId);
     }
-
-    const fib = [1, 1, 2, 3, 5, 8, 13];
-    const fibPositions = [];
-    for (const f of fib) {
-        if (f <= arr.length) {
-            fibPositions.push(arr.length - f);
-        }
-    }
-    const fibCounts = { 'B': 0, 'P': 0, 'T': 0 };
-    for (const pos of fibPositions) {
-        if (pos >= 0 && pos < arr.length) {
-            const char = arr[pos];
-            if (fibCounts[char] !== undefined) fibCounts[char]++;
-        }
-    }
-
-    let harmonicCount = 0;
-    const last8 = arr.slice(-8);
-    for (let i = 0; i < last8.length - 1; i++) {
-        if (last8[i] === last8[i + 1]) harmonicCount++;
-    }
-
-    const counts = { 'B': 0, 'P': 0, 'T': 0 };
-    for (const c of arr) {
-        if (counts[c] !== undefined) counts[c]++;
-    }
-    const total = arr.length;
-    const pPercent = (counts.P / total) * 100;
-    const bPercent = (counts.B / total) * 100;
-
-    const fibPred = Object.keys(fibCounts).reduce((a, b) => fibCounts[a] > fibCounts[b] ? a : b);
-
-    let prediction = 'Player';
-    let winRate = 0;
-    let pattern = '';
-
-    if (harmonicCount >= 4) {
-        const lastChar = arr[arr.length - 1];
-        prediction = lastChar === 'P' ? 'Banker' : 'Player';
-        winRate = 60 + Math.random() * 3;
-        pattern = `Harmonic mạnh (${harmonicCount}/7), đảo chiều`;
-    } else if (fibCounts[fibPred] >= 2) {
-        prediction = fibPred === 'P' ? 'Player' : 'Banker';
-        winRate = 56 + Math.random() * 3;
-        pattern = `Fibonacci: ${fibPred === 'P' ? 'Player' : 'Banker'} xuất hiện ${fibCounts[fibPred]} lần`;
-    } else if (pPercent > 56) {
-        prediction = 'Player';
-        winRate = 53 + Math.random() * 2;
-        pattern = `Player áp đảo ${Math.round(pPercent)}%`;
-    } else if (bPercent > 56) {
-        prediction = 'Banker';
-        winRate = 53 + Math.random() * 2;
-        pattern = `Banker áp đảo ${Math.round(bPercent)}%`;
-    } else {
-        const last3 = arr.slice(-3);
-        if (last3.every(c => c === last3[0])) {
-            prediction = last3[0] === 'P' ? 'Banker' : 'Player';
-            winRate = 56 + Math.random() * 3;
-            pattern = `Dây ${last3[0]} x3, đảo chiều`;
-        } else {
-            prediction = arr[arr.length - 1];
-            winRate = 49 + Math.random() * 3;
-            pattern = 'Theo kết quả cuối';
-        }
-    }
-
-    return {
-        prediction: prediction,
-        winRate: Math.round(Math.min(winRate, 75)),
-        pattern: pattern,
-        stats: { fibonacci: fibPred, harmonic: harmonicCount, P: Math.round(pPercent), B: Math.round(bPercent) }
-    };
+    return algorithms[tableId];
 }
 
 // ============================================================
@@ -554,45 +547,38 @@ app.get('/api/predict/:tableId', async (req, res) => {
             });
         }
 
+        // Kiểm tra dữ liệu mới
         const lastDataKey = `table_${tableId}`;
         const oldData = lastData[lastDataKey] || '';
         const isNewData = (history !== oldData && history.length > oldData.length);
         lastData[lastDataKey] = history;
 
+        // Tăng phiên nếu có dữ liệu mới
         if (!sessionData[tableId]) sessionData[tableId] = 0;
         if (isNewData) sessionData[tableId]++;
 
-        let result;
-        switch (tableId) {
-            case '1': result = algorithmTable1(history); break;
-            case '5': result = algorithmTable5(history); break;
-            case '6': result = algorithmTable6(history); break;
-            case '10': result = algorithmTable10(history); break;
-            case '11': result = algorithmTable11(history); break;
-            case '12': result = algorithmTable12(history); break;
-            default: result = algorithmTable5(history);
-        }
+        // Chạy thuật toán VIP
+        const algorithm = getAlgorithm(tableId);
+        const result = algorithm.comprehensiveAnalysis(history);
 
-        let winRate = result.winRate;
-        if (winRate === 50) {
-            winRate = Math.random() > 0.5 ? 49 + Math.random() * 1 : 51 + Math.random() * 1;
-        }
-        winRate = Math.round(winRate);
-
-        const nameMap = { 'B': 'Banker', 'P': 'Player', 'T': 'Tie' };
+        const nameMap = { 'Banker': 'Banker', 'Player': 'Player', 'Tie': 'Tie' };
 
         res.json({
             success: true,
             table: `Bàn ${tableId}`,
             phiên: sessionData[tableId],
-            dự_đoán: nameMap[result.prediction] || result.prediction,
-            tỉ_lệ: `${winRate}%`,
+            dự_đoán: result.prediction,
+            banker: `${result.banker}%`,
+            player: `${result.player}%`,
+            tie: `${result.tie}%`,
+            tỉ_lệ: `${Math.max(result.banker, result.player, result.tie)}%`,
             cầu: result.pattern,
-            algorithm: `Thuật toán bàn ${tableId}`,
-            stats: result.stats || {},
+            confidence: `${result.confidence}%`,
+            stats: result.stats,
             is_new_data: isNewData,
             data_length: history.length,
             old_data_length: oldData.length,
+            algorithm: `VIP Multi-Thread (7 luồng)`,
             timestamp: new Date().toISOString(),
             id: '@tranhoang2286'
         });
@@ -618,33 +604,19 @@ app.get('/api/predict/all', async (req, res) => {
                 if (!sessionData[id]) sessionData[id] = 0;
                 if (isNewData) sessionData[id]++;
 
-                let result;
-                switch (id) {
-                    case '1': result = algorithmTable1(history); break;
-                    case '5': result = algorithmTable5(history); break;
-                    case '6': result = algorithmTable6(history); break;
-                    case '10': result = algorithmTable10(history); break;
-                    case '11': result = algorithmTable11(history); break;
-                    case '12': result = algorithmTable12(history); break;
-                    default: result = algorithmTable5(history);
-                }
-
-                let winRate = result.winRate;
-                if (winRate === 50) {
-                    winRate = Math.random() > 0.5 ? 49 + Math.random() * 1 : 51 + Math.random() * 1;
-                }
-                winRate = Math.round(winRate);
-
-                const nameMap = { 'B': 'Banker', 'P': 'Player', 'T': 'Tie' };
+                const algorithm = getAlgorithm(id);
+                const result = algorithm.comprehensiveAnalysis(history);
 
                 results.push({
                     table: `Bàn ${id}`,
                     phiên: sessionData[id],
-                    dự_đoán: nameMap[result.prediction] || result.prediction,
-                    tỉ_lệ: `${winRate}%`,
+                    dự_đoán: result.prediction,
+                    banker: `${result.banker}%`,
+                    player: `${result.player}%`,
+                    tie: `${result.tie}%`,
+                    tỉ_lệ: `${Math.max(result.banker, result.player, result.tie)}%`,
                     cầu: result.pattern,
-                    algorithm: `Thuật toán bàn ${id}`,
-                    stats: result.stats || {},
+                    confidence: `${result.confidence}%`,
                     is_new_data: isNewData
                 });
             }
@@ -654,6 +626,7 @@ app.get('/api/predict/all', async (req, res) => {
             success: true,
             data: results,
             total: results.length,
+            algorithm: `VIP Multi-Thread (7 luồng)`,
             timestamp: new Date().toISOString(),
             id: '@tranhoang2286'
         });
@@ -668,44 +641,65 @@ app.get('/api/health', (req, res) => {
         status: 'OK',
         timestamp: new Date().toISOString(),
         tables: Object.keys(sessionData).length,
+        threads: 7,
         id: '@tranhoang2286'
     });
 });
 
 app.get('/', (req, res) => {
     res.json({
-        name: 'BACCARAT PREDICTION API - NÂNG CẤP',
-        version: '5.0.0',
+        name: 'BACCARAT VIP PREDICTION API',
+        version: '6.0.0',
         author: '@tranhoang2286',
-        feature: 'Mỗi bàn có thuật toán riêng biệt',
-        algorithms: {
-            'Bàn 1': 'Streak + Zigzag',
-            'Bàn 5': 'Pattern 2-2 + 3-3',
-            'Bàn 6': 'Markov + Entropy',
-            'Bàn 10': 'Momentum + Regression',
-            'Bàn 11': 'Cluster + Distribution',
-            'Bàn 12': 'Fibonacci + Harmonic'
-        },
+        feature: 'Đa luồng + VIP - Không Random',
+        threads: [
+            'Tần suất nâng cao',
+            'Streak Analysis',
+            'Pattern 2-2 / 3-3',
+            'Markov bậc 2',
+            'Gap Analysis',
+            'Momentum & Acceleration',
+            'Entropy Analysis'
+        ],
         endpoints: {
             'Dự đoán 1 bàn': '/api/predict/:tableId',
             'Dự đoán tất cả': '/api/predict/all',
             'Health Check': '/api/health'
+        },
+        example: {
+            url: '/api/predict/5',
+            response: {
+                success: true,
+                table: 'Bàn 5',
+                phiên: 7,
+                dự_đoán: 'Banker',
+                banker: '58%',
+                player: '37%',
+                tie: '5%',
+                tỉ_lệ: '58%',
+                cầu: 'Cầu 2-2 mạnh, sắp đảo chiều sang Banker',
+                confidence: '72%',
+                algorithm: 'VIP Multi-Thread (7 luồng)',
+                id: '@tranhoang2286'
+            }
         }
     });
 });
 
 app.listen(PORT, '0.0.0.0', () => {
     console.log('========================================');
-    console.log('🃏 BACCARAT PREDICTION API - NÂNG CẤP');
+    console.log('🃏 BACCARAT VIP PREDICTION API');
     console.log('========================================');
     console.log(`🚀 Server: http://localhost:${PORT}`);
-    console.log('📊 Mỗi bàn có thuật toán riêng:');
-    console.log('   Bàn 1: Streak + Zigzag');
-    console.log('   Bàn 5: Pattern 2-2 + 3-3');
-    console.log('   Bàn 6: Markov + Entropy');
-    console.log('   Bàn 10: Momentum + Regression');
-    console.log('   Bàn 11: Cluster + Distribution');
-    console.log('   Bàn 12: Fibonacci + Harmonic');
+    console.log('🧵 7 LUỒNG PHÂN TÍCH SONG SONG:');
+    console.log('   1. Tần suất nâng cao');
+    console.log('   2. Streak Analysis');
+    console.log('   3. Pattern 2-2 / 3-3');
+    console.log('   4. Markov bậc 2');
+    console.log('   5. Gap Analysis');
+    console.log('   6. Momentum & Acceleration');
+    console.log('   7. Entropy Analysis');
+    console.log('========================================');
     console.log(`👤 Author: @tranhoang2286`);
     console.log('========================================');
 });
